@@ -6,7 +6,7 @@ CMakeFiles
 Makefile
 cmake_install.cmake
 # makefile output
-bench_deque_flood
+bench_queue_flood
 # sublimetext 2 stuff
 *.sublime-project
 *.sublime-workspace
