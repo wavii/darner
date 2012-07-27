@@ -15,7 +15,7 @@ ADD_DEFINITIONS(-Wall -Wno-return-type -O2 -g -DNDEBUG)
 INCLUDE_DIRECTORIES(include /usr/local/include/thrift)
 
 ADD_EXECUTABLE(bench_queue_flood
-               src/bench/queue_flood
+               bench/queue_flood
                )
 
 FIND_PACKAGE(Boost 1.46.1 COMPONENTS thread system program_options)
