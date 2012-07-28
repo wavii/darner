@@ -18,6 +18,12 @@ ADD_EXECUTABLE(bench_queue_flood
                bench/queue_flood
                )
 
-FIND_PACKAGE(Boost 1.46.1 COMPONENTS thread system program_options)
+ADD_EXECUTABLE(test
+               tests/queue
+               tests/main
+               )
+
+FIND_PACKAGE(Boost 1.46.1 COMPONENTS thread system program_options unit_test_framework filesystem)
 
 TARGET_LINK_LIBRARIES(bench_queue_flood pthread ${Boost_LIBRARIES} leveldb)
+TARGET_LINK_LIBRARIES(test pthread ${Boost_LIBRARIES} leveldb)
