@@ -17,7 +17,7 @@
 namespace darner {
 
 /*
- * queue is a fifo queue that is (basically) O(1) for pushing/popping.  it boasts these features:
+ * queue is a fifo queue that is O(log(queue size / cache size)) for pushing/popping.  it boasts these features:
  *
  * - no blocking calls for the caller - blocking i/o can run on a separate i/o service thread
  * - an evented wait semantic for queue poppers
