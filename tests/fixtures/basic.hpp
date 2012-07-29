@@ -30,6 +30,11 @@ public:
       boost::filesystem::remove_all(tmp_);
    }
 
+   void delayed_push(const std::string& value, const boost::system::error_code& error)
+   {
+      queue_->push(value, push_cb_);
+   }
+
 protected:
 
    void push_cb(const boost::system::error_code& error)
