@@ -69,7 +69,8 @@ public:
 
    /*
     * pushes a value into the queue.  calls cb after the write with a success code.  on failure, sets error as
-    * io_error if there was a problem with the underlying journal
+    * io_error if there was a problem with the underlying journal.  this method does not manage the lifetime of
+    * the value passed to it - the caller must leave the value unchanged until after cb is called.
     */
    void push(const std::string& value, const push_callback& cb)
    {
