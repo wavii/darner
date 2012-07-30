@@ -40,7 +40,7 @@ public:
    typedef boost::function<void (const boost::system::error_code& error)> pop_end_callback;
 
    queue(boost::asio::io_service& ios,
-         const std::string& journal_path)
+         const std::string& path)
    : journal_(NULL),
      cmp_(NULL),
      head_(0),
@@ -50,8 +50,8 @@ public:
       leveldb::Options options;
       options.create_if_missing = true;
       options.comparator = cmp_ = new comparator();
-      if (!leveldb::DB::Open(options, journal_path, &journal_).ok())
-         throw std::runtime_error("can't open journal: " + journal_path);
+      if (!leveldb::DB::Open(options, path, &journal_).ok())
+         throw std::runtime_error("can't open journal: " + path);
       // get head and tail
       boost::scoped_ptr<leveldb::Iterator> it(journal_->NewIterator(leveldb::ReadOptions()));
       it->SeekToFirst();
