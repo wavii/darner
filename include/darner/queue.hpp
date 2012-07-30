@@ -47,10 +47,10 @@ public:
      tail_(0),
      ios_(ios)
    {
-		leveldb::Options options;
-   	options.create_if_missing = true;
+      leveldb::Options options;
+      options.create_if_missing = true;
       options.comparator = cmp_ = new comparator();
-   	if (!leveldb::DB::Open(options, journal_path, &journal_).ok())
+      if (!leveldb::DB::Open(options, journal_path, &journal_).ok())
          throw std::runtime_error("can't open journal: " + journal_path);
       // get head and tail
       boost::scoped_ptr<leveldb::Iterator> it(journal_->NewIterator(leveldb::ReadOptions()));
@@ -59,7 +59,7 @@ public:
       {
          head_ = *reinterpret_cast<const key_type *>(it->key().data());
          it->SeekToLast();
-         tail_ = *reinterpret_cast<const key_type *>(it->key().data());
+         tail_ = *reinterpret_cast<const key_type *>(it->key().data()) + 1;
       }
    }
 

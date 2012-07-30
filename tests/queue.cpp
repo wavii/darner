@@ -59,8 +59,22 @@ BOOST_FIXTURE_TEST_CASE( test_pop_wait_timeout, fixtures::basic )
    BOOST_REQUIRE(pop_error_);
 }
 
-// test we maintain size correctly
-BOOST_FIXTURE_TEST_CASE( test_queue_size, fixtures::basic )
+// test that we can close and reopen a queue
+BOOST_FIXTURE_TEST_CASE( test_queue_close_reopen, fixtures::basic )
+{
+   string value = "Do you know where to find marble conference tables? I’m looking to have a conference…not until I "
+                  "get the table though";
+   queue_->push(value, push_cb_);
+   queue_.reset(new darner::queue(ios_, (tmp_ / "queue").string()));
+   BOOST_REQUIRE_EQUAL(queue_->count(), 1);
+   queue_->pop(0, pop_cb_);
+   BOOST_REQUIRE(!pop_error_);
+   BOOST_REQUIRE_EQUAL(pop_key_, 0);
+   BOOST_REQUIRE_EQUAL(pop_value_, value);
+}
+
+// test we report count correctly
+BOOST_FIXTURE_TEST_CASE( test_queue_count, fixtures::basic )
 {
    string value = "NO ALCOHOL BEFORE TATTOOS";
    queue_->push(value, push_cb_);
