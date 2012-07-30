@@ -18,7 +18,6 @@ BOOST_FIXTURE_TEST_CASE( test_push_pop, fixtures::basic )
                   "be responsible for this water bottle";
    queue_->push(value, push_cb_);
    queue_->pop(0, pop_cb_);
-   ios_.run();
    BOOST_REQUIRE(!push_error_);
    BOOST_REQUIRE(!pop_error_);
    BOOST_REQUIRE_EQUAL(pop_key_, 0);
@@ -29,7 +28,6 @@ BOOST_FIXTURE_TEST_CASE( test_push_pop, fixtures::basic )
 BOOST_FIXTURE_TEST_CASE( test_pop_empty, fixtures::basic )
 {
    queue_->pop(0, pop_cb_);
-   ios_.run();
    BOOST_REQUIRE(pop_error_);
 }
 
