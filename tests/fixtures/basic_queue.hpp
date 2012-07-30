@@ -1,5 +1,5 @@
-#ifndef __TESTS_FIXTURES_BASIC_HPP__
-#define __TESTS_FIXTURES_BASIC_HPP__
+#ifndef __TESTS_FIXTURES_BASIC_QUEUE_HPP__
+#define __TESTS_FIXTURES_BASIC_QUEUE_HPP__
 
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
@@ -11,21 +11,21 @@
 namespace fixtures {
 
 // create a single basic queue and destroy/delete it when done
-class basic
+class basic_queue
 {
 public:
 
-   basic()
-   : push_cb_(boost::bind(&basic::push_cb, this, _1)),
-     pop_cb_(boost::bind(&basic::pop_cb, this, _1, _2, _3)),
-     pop_end_cb_(boost::bind(&basic::pop_end_cb, this, _1)),
+   basic_queue()
+   : push_cb_(boost::bind(&basic_queue::push_cb, this, _1)),
+     pop_cb_(boost::bind(&basic_queue::pop_cb, this, _1, _2, _3)),
+     pop_end_cb_(boost::bind(&basic_queue::pop_end_cb, this, _1)),
      tmp_(boost::filesystem::temp_directory_path() / boost::filesystem::unique_path())
    {
       boost::filesystem::create_directories(tmp_);
       queue_.reset(new darner::queue(ios_, (tmp_ / "queue").string()));
    }
 
-   virtual ~basic()
+   virtual ~basic_queue()
    {
       queue_.reset();
       boost::filesystem::remove_all(tmp_);
@@ -71,4 +71,4 @@ protected:
 
 } // fixtures
 
-#endif // __TESTS_FIXTURES_BASIC_HPP__
+#endif // __TESTS_FIXTURES_BASIC_QUEUE_HPP__
