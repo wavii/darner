@@ -59,4 +59,18 @@ BOOST_FIXTURE_TEST_CASE( test_pop_wait_timeout, fixtures::basic )
    BOOST_REQUIRE(pop_error_);
 }
 
+// test we maintain size correctly
+BOOST_FIXTURE_TEST_CASE( test_queue_size, fixtures::basic )
+{
+   string value = "NO ALCOHOL BEFORE TATTOOS";
+   queue_->push(value, push_cb_);
+   BOOST_REQUIRE_EQUAL(queue_->count(), 1);
+   // even beginning a pop lowers the count...
+   queue_->pop(0, pop_cb_);
+   BOOST_REQUIRE_EQUAL(queue_->count(), 0);
+   // but returning it raises it back up
+   queue_->pop_end(0, false, pop_end_cb_);
+   BOOST_REQUIRE_EQUAL(queue_->count(), 1);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

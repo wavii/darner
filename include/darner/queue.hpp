@@ -5,6 +5,7 @@
 #include <set>
 
 #include <boost/ptr_container/ptr_list.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
@@ -32,9 +33,10 @@ class queue
 {
 public:
 
-   typedef boost::uint64_t key_t;
+   typedef boost::uint64_t key_type;
+   typedef boost::uint64_t size_type;
    typedef boost::function<void (const boost::system::error_code& error)> push_callback;
-   typedef boost::function<void (const boost::system::error_code& error, key_t key, const std::string& value)> pop_callback;
+   typedef boost::function<void (const boost::system::error_code& error, key_type key, const std::string& value)> pop_callback;
    typedef boost::function<void (const boost::system::error_code& error)> pop_end_callback;
 
    queue(boost::asio::io_service& ios,
@@ -50,13 +52,15 @@ public:
       options.comparator = cmp_ = new comparator();
    	if (!leveldb::DB::Open(options, journal_path, &journal_).ok())
          throw std::runtime_error("can't open journal: " + journal_path);
-   	leveldb::Iterator* it = journal_->NewIterator(leveldb::ReadOptions());
-   	it->SeekToFirst();
-   	if (it->Valid())
-   		head_ = *reinterpret_cast<const key_t *>(it->key().data());
-   	it->SeekToLast();
-   	if (it->Valid())
-   		tail_ = *reinterpret_cast<const key_t *>(it->key().data());
+      // get head and tail
+      boost::scoped_ptr<leveldb::Iterator> it(journal_->NewIterator(leveldb::ReadOptions()));
+      it->SeekToFirst();
+      if (it->Valid())
+      {
+         head_ = *reinterpret_cast<const key_type *>(it->key().data());
+         it->SeekToLast();
+         tail_ = *reinterpret_cast<const key_type *>(it->key().data());
+      }
    }
 
    ~queue()
@@ -74,7 +78,7 @@ public:
     */
    void push(const std::string& value, const push_callback& cb)
    {
-      leveldb::Slice skey(reinterpret_cast<const char *>(&tail_), sizeof(key_t));
+      leveldb::Slice skey(reinterpret_cast<const char *>(&tail_), sizeof(key_type));
       if (!journal_->Put(leveldb::WriteOptions(), skey, value).ok())
       {
          cb(boost::system::error_code(boost::system::errc::io_error, boost::system::system_category()));
@@ -96,7 +100,7 @@ public:
    {
       spin_waiters(); // first let's drive out any current waiters
 
-      key_t key;
+      key_type key;
       if (!next_key(key)) // do we have an item right away?
       {
          if (wait_ms > 0) // okay, no item. can we fire up a timer and wait?
@@ -105,7 +109,7 @@ public:
             it->timer.async_wait(boost::bind(&queue::waiter_timeout, this, boost::asio::placeholders::error, it));
          }
          else
-            cb(boost::asio::error::not_found, key_t(), ""); // nothing?  okay, return back no item
+            cb(boost::asio::error::not_found, key_type(), ""); // nothing?  okay, return back no item
          return;
       }
       get_value(key, cb);
@@ -115,11 +119,11 @@ public:
     * finish the pop, either by deleting the item or returning back to the queue.  calls cb after the pop_end finishes
     * with a success code. on failure, sets error as io_error if there was a problem with the underlying journal.
     */
-   void pop_end(key_t key, bool remove, const pop_end_callback& cb)
+   void pop_end(key_type key, bool remove, const pop_end_callback& cb)
    {
       if (remove)
       {
-         leveldb::Slice skey(reinterpret_cast<const char *>(&key), sizeof(key_t));
+         leveldb::Slice skey(reinterpret_cast<const char *>(&key), sizeof(key_type));
          if (!journal_->Delete(leveldb::WriteOptions(), skey).ok())
             cb(boost::system::error_code(boost::system::errc::io_error, boost::system::system_category()));
          else
@@ -135,6 +139,14 @@ public:
       }
    }
 
+   // returns the number of items in the queue
+   size_type count()
+   {
+      return (tail_ - head_) + returned_.size();
+   }
+
+   // TODO: consider also reporting a queue size
+
 private:
 
    // any operation that mutates the queue or the waiter state should run this to crank any pending events
@@ -144,7 +156,7 @@ private:
       {
          if (waiters_.empty())
             break;
-         key_t key;
+         key_type key;
          if (!next_key(key))
             break;
          boost::ptr_list<waiter>::auto_type waiter = waiters_.release(waiters_.begin());
@@ -154,7 +166,7 @@ private:
 	}
 
    // fetch the next key and return true if there is one
-   bool next_key(key_t & key)
+   bool next_key(key_type & key)
    {
       if (!returned_.empty())
       {
@@ -169,9 +181,9 @@ private:
    }
 
    // fetch the value in the journal at key and pass it to cb
-   void get_value(key_t key, const pop_callback& cb)
+   void get_value(key_type key, const pop_callback& cb)
    {
-      leveldb::Slice skey(reinterpret_cast<const char *>(&key), sizeof(key_t));
+      leveldb::Slice skey(reinterpret_cast<const char *>(&key), sizeof(key_type));
       std::string value;
       boost::system::error_code e;
       if (!journal_->Get(leveldb::ReadOptions(), skey, &value).ok())
@@ -200,9 +212,9 @@ private:
       boost::ptr_list<waiter>::auto_type waiter = waiters_.release(waiter_it);
 
       if (error) // weird unspecified error, better pass it up just in case
-         waiter->cb(error, key_t(), "");
+         waiter->cb(error, key_type(), "");
       else
-         waiter->cb(boost::asio::error::timed_out, key_t(), "");
+         waiter->cb(boost::asio::error::timed_out, key_type(), "");
    }
 
    // compare keys as native uint64's instead of lexically
@@ -211,13 +223,9 @@ private:
    public:
       int Compare(const leveldb::Slice& a, const leveldb::Slice& b) const
       {
-         boost::uint64_t uia = *reinterpret_cast<const boost::uint64_t*>(a.data());
-         boost::uint64_t uib = *reinterpret_cast<const boost::uint64_t*>(b.data());
-         if (uia < uib)
-            return -1;
-         if (uia > uib)
-            return 1;
-         return 0;
+         key_type uia = *reinterpret_cast<const key_type*>(a.data());
+         key_type uib = *reinterpret_cast<const key_type*>(b.data());
+         return (uia < uib ? -1 : (uia > uib ? 1 : 0));
       }
       const char* Name() const { return "queue::comparator"; }
       void FindShortestSeparator(std::string*, const leveldb::Slice&) const { }
@@ -233,9 +241,9 @@ private:
    // reserved items are held by a connection and not finished yet
    // returned items were released by a connection but not deleted
 
-   boost::uint64_t head_;
-   boost::uint64_t tail_;
-   std::set<key_t> returned_; // items < TAIL that were reserved but later returned (not popped)
+   key_type head_;
+   key_type tail_;
+   std::set<key_type> returned_; // items < TAIL that were reserved but later returned (not popped)
 
    boost::ptr_list<waiter> waiters_;
 

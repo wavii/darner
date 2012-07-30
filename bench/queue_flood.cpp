@@ -45,7 +45,7 @@ private:
          ios_.post(boost::bind(&queue::push, &q_, boost::cref(value_), push_cb_));
    }
 
-   void pop_cb(const boost::system::error_code& error, queue::key_t key, const std::string& value)
+   void pop_cb(const boost::system::error_code& error, queue::key_type key, const std::string& value)
    {
       if (!error)
          q_.pop_end(key, true, pop_end_cb_);
