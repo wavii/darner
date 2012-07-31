@@ -20,6 +20,7 @@ ADD_EXECUTABLE(bench_queue_flood
 
 ADD_EXECUTABLE(test
                tests/queue
+               tests/fs
                tests/main
                )
 
