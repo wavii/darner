@@ -42,14 +42,14 @@ public:
    queue(boost::asio::io_service& ios,
          const std::string& path)
    : journal_(NULL),
-     cmp_(NULL),
+     cmp_(new comparator()),
      head_(0),
      tail_(0),
      ios_(ios)
    {
       leveldb::Options options;
       options.create_if_missing = true;
-      options.comparator = cmp_ = new comparator();
+      options.comparator = cmp_.get();
       if (!leveldb::DB::Open(options, path, &journal_).ok())
          throw std::runtime_error("can't open journal: " + path);
       // get head and tail
@@ -67,8 +67,6 @@ public:
    {
       if (journal_)
          delete journal_;
-      if (cmp_)
-         delete cmp_;
    }
 
    /*
@@ -233,7 +231,7 @@ private:
    };
 
    leveldb::DB* journal_;
-   comparator* cmp_;
+   boost::scoped_ptr<comparator> cmp_;
 
    // layout of journal is:
    // --- < reserved or returned > --- | TAIL | --- < contiguous items > --- | HEAD |
