@@ -41,8 +41,7 @@ public:
 
    queue(boost::asio::io_service& ios,
          const std::string& path)
-   : journal_(NULL),
-     cmp_(new comparator()),
+   : cmp_(new comparator()),
      head_(0),
      tail_(0),
      ios_(ios)
@@ -50,8 +49,10 @@ public:
       leveldb::Options options;
       options.create_if_missing = true;
       options.comparator = cmp_.get();
-      if (!leveldb::DB::Open(options, path, &journal_).ok())
+      leveldb::DB* pdb;
+      if (!leveldb::DB::Open(options, path, &pdb).ok())
          throw std::runtime_error("can't open journal: " + path);
+      journal_.reset(pdb);
       // get head and tail
       boost::scoped_ptr<leveldb::Iterator> it(journal_->NewIterator(leveldb::ReadOptions()));
       it->SeekToFirst();
@@ -61,12 +62,6 @@ public:
          it->SeekToLast();
          tail_ = *reinterpret_cast<const key_type *>(it->key().data()) + 1;
       }
-   }
-
-   ~queue()
-   {
-      if (journal_)
-         delete journal_;
    }
 
    /*
@@ -230,7 +225,7 @@ private:
       void FindShortSuccessor(std::string*) const { }
    };
 
-   leveldb::DB* journal_;
+   boost::scoped_ptr<leveldb::DB> journal_;
    boost::scoped_ptr<comparator> cmp_;
 
    // layout of journal is:

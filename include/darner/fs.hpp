@@ -44,8 +44,7 @@ public:
 
    fs(boost::asio::io_service& ios,
       const std::string& path)
-   : chunks_(NULL),
-     cmp_(new comparator()),
+   : cmp_(new comparator()),
      tail_(0),
      ios_(ios)
    {
