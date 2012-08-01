@@ -42,7 +42,7 @@ struct request_grammar : boost::spirit::qi::grammar<Iterator>
       using namespace boost;
 
       key_name =
-         +((qi::alnum|qi::punct) - '/') [_val += qi::_1];
+         +((qi::alnum|qi::punct) - '/');
 
       stats =
          lit("STATS")     [phoenix::ref(req_.type) = request::RT_STATS];
