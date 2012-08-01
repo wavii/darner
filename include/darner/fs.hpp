@@ -17,7 +17,9 @@ namespace darner {
 
 /*
  * fs is a blob store. a blob is a series of chunks.  blobs can be read in a chunk at a time via an istream,
- * or written out a chunk at a time via on ostream.
+ * or written out a chunk at a time via on ostream.  fs provides a predictable upper bound to the amount of memory
+ * required to store a large item (at most, the size of a chunk), and the amount of time needed to process an event
+ * (at most, the time it takes to write a chunk-size value to leveldb),
  *
  * fs is not thread-safe, it assumes a single-thread calling and operating the provided io_service
  */
@@ -30,7 +32,10 @@ public:
    typedef boost::uint64_t key_type;
    typedef boost::uint64_t size_type;
    typedef std::pair<key_type, size_type> chunkptr_type; // key and chunk index
-   struct header // 16 byte header is the first chunk of every blob
+
+   // every blob has multiple chunks.  the first chunk of every blob (chunk index zero) is a 16 byte header that
+   // records the total size of the blob and how many chunks (including the header chunk) it encompasses
+   struct header
    {
       header(size_type _size, size_type _chunks): size(_size), chunks(_chunks) {}
       size_type size;
@@ -47,19 +52,15 @@ public:
       leveldb::Options options;
       options.create_if_missing = true;
       options.comparator = cmp_.get();
-      if (!leveldb::DB::Open(options, path, &chunks_).ok())
+      leveldb::DB* pdb;
+      if (!leveldb::DB::Open(options, path, &pdb).ok())
          throw std::runtime_error("can't open chunk store: " + path);
+      chunks_.reset(pdb);
       // tail just marks a convenient way to track a unique identifier for each new key
       boost::scoped_ptr<leveldb::Iterator> it(chunks_->NewIterator(leveldb::ReadOptions()));
       it->SeekToLast();
       if (it->Valid())
          tail_ = *reinterpret_cast<const key_type *>(it->key().data()) + 1;
-   }
-
-   ~fs()
-   {
-      if (chunks_)
-         delete chunks_;
    }
 
    class istream
@@ -119,7 +120,7 @@ public:
             cb(boost::system::error_code());
       }
 
-      size_type size()
+      size_type size() const
       {
          return header_.size;
       }
@@ -150,7 +151,7 @@ public:
             ++ptr_.second;
       }
 
-      key_type key()
+      key_type key() const
       {
          return ptr_.first;
       }
@@ -179,7 +180,7 @@ public:
          cb(e);
       }
 
-      size_type size()
+      size_type size() const
       {
          return header_.size;
       }
@@ -209,7 +210,7 @@ private:
       void FindShortSuccessor(std::string*) const { }
    };
 
-   leveldb::DB* chunks_;
+   boost::scoped_ptr<leveldb::DB> chunks_;
    boost::scoped_ptr<comparator> cmp_;
 
    key_type tail_;
