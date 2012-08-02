@@ -1,8 +1,6 @@
 #ifndef __DARNER_SERVER_HPP__
 #define __DARNER_SERVER_HPP__
 
-#define DARNER_VERSION "0.0.1"
-
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>

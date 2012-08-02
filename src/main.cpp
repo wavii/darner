@@ -28,13 +28,12 @@ int main(int argc, char * argv[])
 
    // options allow both on command line and in a config file
    int port;
-   bool debug;
    string data_path;
    size_t workers;
 
    po::options_description config("Configuration");
    config.add_options()
-      ("debug", po::value<bool>(&debug)->default_value(false), "debug (verbose) output")
+      ("debug", "debug (verbose) output")
       ("port,p", po::value<int>(&port)->default_value(22133), "port upon which to listen")
       ("workers,j", po::value<size_t>(&workers)->default_value(1), "number of worker threads")
       ("data,d", po::value<string>(&data_path)->default_value("data"), "data directory")
@@ -93,20 +92,21 @@ int main(int argc, char * argv[])
       }
    }
 
-   log::init(debug);
+   if (!fs::exists(data_path))
+   {
+      cerr << "cannot find the data directory: " << data_path << endl;
+      return 1;
+   }
+
+   log::init(vm.count("debug"));
 
    log::INFO("darner: queue server");
    log::INFO("build: %1% (%2%) v%3% (c) Wavii, Inc.", __DATE__, __TIME__, DARNER_VERSION);
    log::INFO("worker threads: %1%", workers);
    log::INFO("listening on port: %1%", port);
-
-   if (data_path.empty() || !fs::exists(data_path))
-   {
-      log::ERROR("cannot find the data directory: %1%", data_path);
-      return 1;
-   }
-
    log::INFO("data dir: %1%", data_path);
+   if (vm.count("debug"))
+      log::INFO("debug logging is turned ON");
 
    // TODO: we're doing some manual pthread/signal stuff here
    // migrate to signal_set when we are ready to use boost 1.47 
