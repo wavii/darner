@@ -21,8 +21,7 @@ public:
    connection(boost::asio::io_service& ios,
               size_t max_frame_size = 4096)
    : socket_(ios),
-     buf_(max_frame_size),
-     grammar_(req_)
+     buf_(max_frame_size)
    {
    }
 
@@ -57,14 +56,15 @@ private:
          return;
       }
 
-      good_request_ = grammar_.parse(std::string((std::istreambuf_iterator<char>(&buf_)),
+      good_request_ = parser_.parse(req_, std::string((std::istreambuf_iterator<char>(&buf_)),
          std::istreambuf_iterator<char>()));
+
       const char* response = good_request_ ? "OK\r\n" : "ERROR\r\n";
       buf_.consume(buf_.size());
 
       boost::asio::async_write(
          socket_,
-         boost::asio::buffer(response, ::strlen(response)),
+         boost::asio::buffer(response),
          boost::bind(&connection::handle_write_response,
             shared_from_this(),
             boost::asio::placeholders::error,
@@ -94,7 +94,7 @@ private:
    socket_type socket_;
    boost::asio::streambuf buf_;
    request req_;
-   request_grammar<std::string::const_iterator> grammar_;
+   request_parser<std::string::const_iterator> parser_;
    bool good_request_;
 };
 

@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <boost/thread/tss.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
@@ -34,9 +35,8 @@ struct request
 template <class Iterator>
 struct request_grammar : boost::spirit::qi::grammar<Iterator>
 {
-   request_grammar(request& req)
-   : request_grammar::base_type(start),
-     req_(req)
+   request_grammar()
+   : request_grammar::base_type(start)
    {
       using namespace boost::spirit;
       using namespace boost;
@@ -79,21 +79,42 @@ struct request_grammar : boost::spirit::qi::grammar<Iterator>
       start = (stats | version | flush | flush_all | set | get) >> qi::eol;
    }
 
-   bool parse(Iterator begin, Iterator end)
+   bool parse(request& req, Iterator begin, Iterator end)
    {
       new(&req_) request(); // spooky placement new!
-      return boost::spirit::qi::parse(begin, end, *this) && (begin == end);
+      bool success = boost::spirit::qi::parse(begin, end, *this) && (begin == end);
+      if (success)
+         req = req_;
+      return success;
+   }
+
+   request req_;
+   boost::spirit::qi::rule<Iterator, std::string()> key_name;
+   boost::spirit::qi::rule<Iterator> stats, version, flush, flush_all, set, get_option, get, start;
+};
+
+// grammar are expensive to construct.  to be thread-safe, let's make one grammar per thread.
+template <class Iterator>
+class request_parser
+{
+public:
+
+   bool parse(request& req, Iterator begin, Iterator end)
+   {
+      if (!grammar_.get())
+         grammar_.reset(new request_grammar<Iterator>());
+      return grammar_->parse(req, begin, end);
    }
 
    template <class Sequence>
-   bool parse(const Sequence& seq)
+   bool parse(request& req, const Sequence& seq)
    {
-      return parse(seq.begin(), seq.end());
+      return parse(req, seq.begin(), seq.end());
    }
 
-   request& req_;
-   boost::spirit::qi::rule<Iterator, std::string()> key_name;
-   boost::spirit::qi::rule<Iterator> stats, version, flush, flush_all, set, get_option, get, start;
+private:
+
+   boost::thread_specific_ptr<request_grammar<Iterator> > grammar_;
 };
 
 } // darner
