@@ -6,8 +6,8 @@
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 
-#include "darner/request.hpp"
 #include "darner/log.h"
+#include "darner/request.hpp"
 
 namespace darner {
 
@@ -19,8 +19,10 @@ public:
    typedef boost::shared_ptr<connection> ptr_type;
 
    connection(boost::asio::io_service& ios,
+              request_parser<std::string::const_iterator>& parser,
               size_t max_frame_size = 4096)
    : socket_(ios),
+     parser_(parser),
      buf_(max_frame_size)
    {
    }
@@ -92,9 +94,9 @@ private:
    }
 
    socket_type socket_;
+   request_parser<std::string::const_iterator>& parser_;
    boost::asio::streambuf buf_;
    request req_;
-   request_parser<std::string::const_iterator> parser_;
    bool good_request_;
 };
 

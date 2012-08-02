@@ -6,6 +6,7 @@
 #include <boost/asio.hpp>
 
 #include "darner/log.h"
+#include "darner/request.hpp"
 #include "darner/connection.hpp"
 
 namespace darner {
@@ -37,7 +38,7 @@ public:
       acceptor_.listen();
 
       // get our first conn ready
-      session_ = connection::ptr_type(new connection(ios_));
+      session_ = connection::ptr_type(new connection(ios_, parser_));
 
       // pump the first async accept into the loop
       acceptor_.async_accept(session_->socket(),
@@ -72,7 +73,7 @@ private:
 
       session_->start();
 
-      session_ = connection::ptr_type(new connection(ios_));
+      session_ = connection::ptr_type(new connection(ios_, parser_));
       acceptor_.async_accept(session_->socket(),
          boost::bind(&server::handle_accept, this, boost::asio::placeholders::error));
    }
@@ -84,6 +85,7 @@ private:
    boost::asio::io_service ios_;
    connection::ptr_type session_;
    boost::asio::ip::tcp::acceptor acceptor_;
+   request_parser<std::string::const_iterator> parser_;
    boost::thread_group workers_;
 };
 
