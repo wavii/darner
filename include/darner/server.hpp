@@ -52,7 +52,8 @@ public:
 
    void stop()
    {
-      // TODO: whatever interrupt behavior is needed
+      acceptor_.close();
+      // TODO: also close any idling clients
    }
 
    void join()
