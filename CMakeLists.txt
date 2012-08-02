@@ -14,6 +14,11 @@ ADD_DEFINITIONS(-Wall -Wno-return-type -O2 -g -DNDEBUG)
 
 INCLUDE_DIRECTORIES(include /usr/local/include/thrift)
 
+ADD_EXECUTABLE(darner
+               src/log
+               src/main
+               )
+
 ADD_EXECUTABLE(bench_queue_flood
                bench/queue_flood
                )
@@ -27,5 +32,6 @@ ADD_EXECUTABLE(test
 
 FIND_PACKAGE(Boost 1.46.1 COMPONENTS thread system program_options unit_test_framework filesystem)
 
+TARGET_LINK_LIBRARIES(darner pthread ${Boost_LIBRARIES} leveldb)
 TARGET_LINK_LIBRARIES(bench_queue_flood pthread ${Boost_LIBRARIES} leveldb)
 TARGET_LINK_LIBRARIES(test pthread ${Boost_LIBRARIES} leveldb)
