@@ -7,6 +7,7 @@ Makefile
 cmake_install.cmake
 # makefile output
 darner
+!include/darner
 bench_queue_flood
 test
 # sublimetext 2 stuff
