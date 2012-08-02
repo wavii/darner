@@ -35,7 +35,7 @@ int main(int argc, char * argv[])
    po::options_description config("Configuration");
    config.add_options()
       ("debug", po::value<bool>(&debug)->default_value(false), "debug (verbose) output")
-      ("port,p", po::value<int>(&port)->default_value(21233), "port upon which to listen")
+      ("port,p", po::value<int>(&port)->default_value(22133), "port upon which to listen")
       ("workers,j", po::value<size_t>(&workers)->default_value(1), "number of worker threads")
       ("data,d", po::value<string>(&data_path)->default_value("data"), "data directory")
   ;
@@ -119,6 +119,8 @@ int main(int argc, char * argv[])
    log::INFO("starting up");
 
    server s(data_path, port, workers);
+
+   s.start();
 
    // Restore previous signals.
    pthread_sigmask(SIG_SETMASK, &old_mask, 0);
