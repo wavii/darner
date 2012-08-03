@@ -18,9 +18,8 @@ struct request
       RT_VERSION   = 2,
       RT_FLUSH     = 3,
       RT_FLUSH_ALL = 4,
-      RT_DELETE    = 5,
-      RT_SET       = 6,
-      RT_GET       = 7
+      RT_SET       = 5,
+      RT_GET       = 6
    };
 
    request_type type;

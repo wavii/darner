@@ -3,11 +3,12 @@
 
 #include <pthread.h>
 #include <signal.h>
+#include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
 
 #include "darner/util/log.h"
-#include "darner/util/stats.hpp"
+#include "darner/handler.h"
 #include "darner/net/server.hpp"
 
 using namespace std;
@@ -119,10 +120,8 @@ int main(int argc, char * argv[])
 
    log::INFO("starting up");
 
-   stats _stats;
-   server s(data_path, port, workers, _stats);
-
-   s.start();
+   request_handler handler(data_path);
+   server srv(handler, port, workers);
 
    // Restore previous signals.
    pthread_sigmask(SIG_SETMASK, &old_mask, 0);
@@ -140,10 +139,9 @@ int main(int argc, char * argv[])
    // Stop the server.
    log::INFO("received signal. stopping server and finishing work.");
 
-   s.stop();
-   s.join();
+   srv.stop(); // stop accepting, wait for connections to all close out
 
-   log::INFO("shutting down");
+   log::INFO("shut down. ciao.");
 
    return 0;
 }

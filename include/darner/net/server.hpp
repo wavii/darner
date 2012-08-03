@@ -8,7 +8,7 @@
 #include "darner/util/log.h"
 #include "darner/net/request.h"
 #include "darner/net/connection.hpp"
-#include "darner/util/stats.hpp"
+#include "darner/handler.h"
 
 namespace darner {
 
@@ -19,19 +19,14 @@ class server
 {
 public:
 
-   server(const std::string& data_path,
+   server(request_handler& handler,
           unsigned short listen_port,
-          size_t num_workers,
-          stats& stats)
-   : data_path_(data_path),
+          size_t num_workers)
+   : handler_(handler),
      listen_port_(listen_port),
      num_workers_(num_workers),
-     stats_(stats),
-     acceptor_(ios_)
-   {
-   }
-
-   void start()
+     acceptor_(ios_),
+     strand_(ios_)
    {
       // open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
       boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::tcp::v4(), listen_port_);
@@ -41,7 +36,7 @@ public:
       acceptor_.listen();
 
       // get our first conn ready
-      session_ = connection::ptr_type(new connection(ios_, parser_, stats_));
+      session_ = connection::ptr_type(new connection(ios_, parser_, handler_));
 
       // pump the first async accept into the loop
       acceptor_.async_accept(session_->socket(),
@@ -54,8 +49,8 @@ public:
 
    void stop()
    {
-      acceptor_.close();
-      // TODO: also close any idling clients
+      strand_.post(boost::bind(&server::handle_close, this));
+      // TODO: also close any idling clients, delete the work
    }
 
    void join()
@@ -76,20 +71,26 @@ private:
 
       session_->start();
 
-      session_ = connection::ptr_type(new connection(ios_, parser_, stats_));
+      session_ = connection::ptr_type(new connection(ios_, parser_, handler_));
       acceptor_.async_accept(session_->socket(),
-         boost::bind(&server::handle_accept, this, boost::asio::placeholders::error));
+         strand_.wrap(
+            boost::bind(&server::handle_accept, this, boost::asio::placeholders::error)));
    }
 
-   const std::string data_path_;
+   void handle_close()
+   {
+      acceptor_.close();
+   }
+
+   request_handler& handler_;
    unsigned short listen_port_;
    size_t num_workers_;
-   stats& stats_;
 
    boost::asio::io_service ios_;
-   connection::ptr_type session_;
    boost::asio::ip::tcp::acceptor acceptor_;
+   boost::asio::strand strand_; // to avoid close() and async_accept firing at the same time
    request_parser parser_;
+   connection::ptr_type session_;
    boost::thread_group workers_;
 };
 

@@ -7,8 +7,8 @@
 #include <boost/asio.hpp>
 
 #include "darner/util/log.h"
-#include "darner/util/stats.hpp"
 #include "darner/net/request.h"
+#include "darner/handler.h"
 
 namespace darner {
 
@@ -21,22 +21,21 @@ public:
 
    connection(boost::asio::io_service& ios,
               request_parser& parser,
-              stats& stats,
+              request_handler& handler,
               size_t max_frame_size = 4096)
    : socket_(ios),
      parser_(parser),
-     stats_(stats),
-     in_buf_(max_frame_size),
-     out_buf_(max_frame_size)
+     handler_(handler),
+     in_buf_(max_frame_size)
    {
-      boost::mutex::scoped_lock lock(stats_.mutex);
-      ++stats_.curr_connections;
+      boost::mutex::scoped_lock lock(handler_.get_stats().mutex);
+      ++handler_.get_stats().conns_opened;
    }
 
    ~connection()
    {
-      boost::mutex::scoped_lock lock(stats_.mutex);
-      --stats_.curr_connections;
+      boost::mutex::scoped_lock lock(handler_.get_stats().mutex);
+      ++handler_.get_stats().conns_closed;
    }
 
    socket_type& socket()
@@ -81,11 +80,10 @@ private:
 
       if (!good_)
       {
-         std::ostream o(&out_buf_);
-         o << "ERROR\r\n";
+         out_buf_ = "ERROR\r\n";
          async_write(
             socket_,
-            out_buf_,
+            boost::asio::buffer(out_buf_),
             boost::bind(&connection::handle_write_result,
                shared_from_this(),
                boost::asio::placeholders::error,
@@ -93,19 +91,20 @@ private:
          return;
       }
 
+      request_handler::response_callback cb(
+         boost::bind(&connection::handle_response,
+            shared_from_this(),
+            boost::asio::placeholders::error));
+
       switch (req_.type)
       {
-      case request::RT_STATS:
-         handle_stats_request();
-         break;
-      case request::RT_VERSION:
-         break;
+      case request::RT_STATS:   handler_.handle_stats(socket_, cb); break;
+      case request::RT_VERSION: break;
+      case request::RT_FLUSH: break;
+      case request::RT_FLUSH_ALL: break;
+      case request::RT_SET: break;
+      case request::RT_GET: break;
       }
-   }
-
-   void handle_stats_request()
-   {
-
    }
 
    void handle_write_result(const boost::system::error_code& e,
@@ -124,11 +123,16 @@ private:
                boost::asio::placeholders::bytes_transferred));
    }
 
+   void handle_response(const boost::system::error_code& e)
+   {
+      
+   }
+
    socket_type socket_;
    request_parser& parser_;
-   stats& stats_;
+   request_handler& handler_;
    boost::asio::streambuf in_buf_;
-   boost::asio::streambuf out_buf_;
+   std::string out_buf_;
    request req_;
    bool good_;
 };
