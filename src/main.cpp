@@ -7,6 +7,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "darner/util/log.h"
+#include "darner/util/stats.hpp"
 #include "darner/net/server.hpp"
 
 using namespace std;
@@ -118,7 +119,8 @@ int main(int argc, char * argv[])
 
    log::INFO("starting up");
 
-   server s(data_path, port, workers);
+   stats _stats;
+   server s(data_path, port, workers, _stats);
 
    s.start();
 

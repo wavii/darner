@@ -21,10 +21,12 @@ public:
 
    server(const std::string& data_path,
           unsigned short listen_port,
-          size_t num_workers)
+          size_t num_workers,
+          stats& stats)
    : data_path_(data_path),
      listen_port_(listen_port),
      num_workers_(num_workers),
+     stats_(stats),
      acceptor_(ios_)
    {
    }
@@ -39,7 +41,7 @@ public:
       acceptor_.listen();
 
       // get our first conn ready
-      session_ = connection::ptr_type(new connection(ios_, parser_));
+      session_ = connection::ptr_type(new connection(ios_, parser_, stats_));
 
       // pump the first async accept into the loop
       acceptor_.async_accept(session_->socket(),
@@ -74,7 +76,7 @@ private:
 
       session_->start();
 
-      session_ = connection::ptr_type(new connection(ios_, parser_));
+      session_ = connection::ptr_type(new connection(ios_, parser_, stats_));
       acceptor_.async_accept(session_->socket(),
          boost::bind(&server::handle_accept, this, boost::asio::placeholders::error));
    }
@@ -82,13 +84,13 @@ private:
    const std::string data_path_;
    unsigned short listen_port_;
    size_t num_workers_;
+   stats& stats_;
 
    boost::asio::io_service ios_;
    connection::ptr_type session_;
    boost::asio::ip::tcp::acceptor acceptor_;
    request_parser parser_;
    boost::thread_group workers_;
-   stats stats_;
 };
 
 } // darner

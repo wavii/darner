@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 
 #include "darner/util/log.h"
+#include "darner/util/stats.hpp"
 #include "darner/net/request.h"
 
 namespace darner {
@@ -20,11 +21,22 @@ public:
 
    connection(boost::asio::io_service& ios,
               request_parser& parser,
+              stats& stats,
               size_t max_frame_size = 4096)
    : socket_(ios),
      parser_(parser),
-     in_buf_(max_frame_size)
+     stats_(stats),
+     in_buf_(max_frame_size),
+     out_buf_(max_frame_size)
    {
+      boost::mutex::scoped_lock lock(stats_.mutex);
+      ++stats_.curr_connections;
+   }
+
+   ~connection()
+   {
+      boost::mutex::scoped_lock lock(stats_.mutex);
+      --stats_.curr_connections;
    }
 
    socket_type& socket()
@@ -69,7 +81,8 @@ private:
 
       if (!good_)
       {
-         std::ostream(&out_buf_) << "ERROR\r\n";
+         std::ostream o(&out_buf_);
+         o << "ERROR\r\n";
          async_write(
             socket_,
             out_buf_,
@@ -101,8 +114,6 @@ private:
       if (e)
          log::ERROR("connection<%1%>::handle_write_result: ", shared_from_this(), e.message());
       else if (good_)
-      {
-         out_buf_.consume(bytes_transferred);
          boost::asio::async_read_until(
             socket_,
             in_buf_,
@@ -111,11 +122,11 @@ private:
                shared_from_this(),
                boost::asio::placeholders::error,
                boost::asio::placeholders::bytes_transferred));
-      }
    }
 
    socket_type socket_;
    request_parser& parser_;
+   stats& stats_;
    boost::asio::streambuf in_buf_;
    boost::asio::streambuf out_buf_;
    request req_;
