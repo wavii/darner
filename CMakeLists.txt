@@ -11,6 +11,7 @@ ADD_DEFINITIONS(-Wall -Wno-return-type -O2 -g -DNDEBUG -DDARNER_VERSION="${DARNE
 INCLUDE_DIRECTORIES(include /usr/local/include/thrift)
 
 ADD_EXECUTABLE(darner
+               src/net/request
                src/log
                src/main
                )
@@ -20,6 +21,7 @@ ADD_EXECUTABLE(bench_queue_flood
                )
 
 ADD_EXECUTABLE(test
+               src/net/request
                tests/queue
                tests/request
                tests/fs

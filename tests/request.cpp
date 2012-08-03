@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "darner/request.hpp"
+#include "darner/net/request.h"
 #include "fixtures/basic_request.hpp"
 
 using namespace std;

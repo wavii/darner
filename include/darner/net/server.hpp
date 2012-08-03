@@ -5,9 +5,10 @@
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
 
-#include "darner/log.h"
-#include "darner/request.hpp"
-#include "darner/connection.hpp"
+#include "darner/util/log.h"
+#include "darner/net/request.h"
+#include "darner/net/connection.hpp"
+#include "darner/util/stats.hpp"
 
 namespace darner {
 
@@ -85,8 +86,9 @@ private:
    boost::asio::io_service ios_;
    connection::ptr_type session_;
    boost::asio::ip::tcp::acceptor acceptor_;
-   request_parser<std::string::const_iterator> parser_;
+   request_parser parser_;
    boost::thread_group workers_;
+   stats stats_;
 };
 
 } // darner

@@ -6,8 +6,8 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
 
-#include "darner/log.h"
-#include "darner/server.hpp"
+#include "darner/util/log.h"
+#include "darner/net/server.hpp"
 
 using namespace std;
 using namespace boost;

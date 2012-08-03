@@ -1,7 +1,7 @@
 #ifndef __TESTS_FIXTURES_BASIC_REQUEST_HPP__
 #define __TESTS_FIXTURES_BASIC_REQUEST_HPP__
 
-#include "darner/request.hpp"
+#include "darner/net/request.h"
 
 namespace fixtures {
 
@@ -11,7 +11,7 @@ class basic_request
 protected:
 
    darner::request request_;
-   darner::request_parser<std::string::const_iterator> parser_;
+   darner::request_parser parser_;
 };
 
 } // fixtures
