@@ -8,7 +8,6 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "darner/util/log.h"
-#include "darner/handler.h"
 #include "darner/net/server.hpp"
 
 using namespace std;
@@ -120,8 +119,7 @@ int main(int argc, char * argv[])
 
    log::INFO("starting up");
 
-   request_handler handler(data_path);
-   server srv(handler, port, workers);
+   server srv(data_path, port, workers);
 
    // Restore previous signals.
    pthread_sigmask(SIG_SETMASK, &old_mask, 0);

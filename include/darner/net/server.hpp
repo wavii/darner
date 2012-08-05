@@ -6,9 +6,9 @@
 #include <boost/asio.hpp>
 
 #include "darner/util/log.h"
+#include "darner/util/stats.hpp"
 #include "darner/net/request.h"
-#include "darner/net/connection.hpp"
-#include "darner/handler.h"
+#include "darner/net/handler.h"
 
 namespace darner {
 
@@ -19,10 +19,10 @@ class server
 {
 public:
 
-   server(request_handler& handler,
+   server(const std::string& data_path,
           unsigned short listen_port,
           size_t num_workers)
-   : handler_(handler),
+   : data_path_(data_path),
      listen_port_(listen_port),
      num_workers_(num_workers),
      acceptor_(ios_),
@@ -36,10 +36,10 @@ public:
       acceptor_.listen();
 
       // get our first conn ready
-      session_ = connection::ptr_type(new connection(ios_, parser_, handler_));
+      handler_ = handler::ptr_type(new handler(ios_, parser_, stats_));
 
       // pump the first async accept into the loop
-      acceptor_.async_accept(session_->socket(),
+      acceptor_.async_accept(handler_->socket(),
          boost::bind(&server::handle_accept, this, boost::asio::placeholders::error));
 
       // spin up the threads that run the io service
@@ -69,10 +69,10 @@ private:
          return;
       }
 
-      session_->start();
+      handler_->start();
 
-      session_ = connection::ptr_type(new connection(ios_, parser_, handler_));
-      acceptor_.async_accept(session_->socket(),
+      handler_ = handler::ptr_type(new handler(ios_, parser_, stats_));
+      acceptor_.async_accept(handler_->socket(),
          strand_.wrap(
             boost::bind(&server::handle_accept, this, boost::asio::placeholders::error)));
    }
@@ -82,7 +82,7 @@ private:
       acceptor_.close();
    }
 
-   request_handler& handler_;
+   std::string data_path_;
    unsigned short listen_port_;
    size_t num_workers_;
 
@@ -90,7 +90,8 @@ private:
    boost::asio::ip::tcp::acceptor acceptor_;
    boost::asio::strand strand_; // to avoid close() and async_accept firing at the same time
    request_parser parser_;
-   connection::ptr_type session_;
+   stats stats_;
+   handler::ptr_type handler_;
    boost::thread_group workers_;
 };
 
