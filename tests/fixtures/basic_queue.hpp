@@ -19,6 +19,7 @@ public:
    : push_cb_(boost::bind(&basic_queue::push_cb, this, _1, _2)),
      pop_cb_(boost::bind(&basic_queue::pop_cb, this, _1, _2, _3)),
      pop_end_cb_(boost::bind(&basic_queue::pop_end_cb, this, _1)),
+     push_cancel_cb_(boost::bind(&basic_queue::push_cancel_cb, this, _1)),
      tmp_(boost::filesystem::temp_directory_path() / boost::filesystem::unique_path())
    {
       boost::filesystem::create_directories(tmp_);
@@ -56,6 +57,11 @@ protected:
       pop_end_error_ = error;
    }
 
+   void push_cancel_cb(const boost::system::error_code& error)
+   {
+      push_cancel_error_ = error;
+   }
+
    boost::system::error_code push_error_;
    darner::file_type push_file_;
    boost::system::error_code pop_error_;
@@ -63,10 +69,12 @@ protected:
    std::string pop_value_;
 
    boost::system::error_code pop_end_error_;
+   boost::system::error_code push_cancel_error_;
 
    darner::queue::push_callback push_cb_;
    darner::queue::pop_callback pop_cb_;
    darner::queue::success_callback pop_end_cb_;
+   darner::queue::success_callback push_cancel_cb_;
    boost::asio::io_service ios_;
    boost::shared_ptr<darner::queue> queue_;
    boost::filesystem::path tmp_;

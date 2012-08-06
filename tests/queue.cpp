@@ -84,4 +84,68 @@ BOOST_FIXTURE_TEST_CASE( test_queue_count, fixtures::basic_queue )
    BOOST_REQUIRE_EQUAL(queue_->count(), 1);
 }
 
+// test that we can push/pop multi-chunked
+BOOST_FIXTURE_TEST_CASE( test_multi_chunked, fixtures::basic_queue )
+{
+   string value1 = "I don’t ever watch dramas on a plane... I don’t be wanting to reflect";
+   string value2 = "I make awesome decisions in bike stores!!!";
+   queue_->push_reserve(push_file_, 2);
+   BOOST_REQUIRE_EQUAL(push_file_.header.chunk_beg, 0);
+   BOOST_REQUIRE_EQUAL(push_file_.header.chunk_end, 2);
+   BOOST_REQUIRE_EQUAL(push_file_.tell, 0);
+
+   queue_->push_chunk(push_file_, value1, push_cb_);
+   BOOST_REQUIRE_EQUAL(queue_->count(), 0); // not ready yet...
+   BOOST_REQUIRE_EQUAL(push_file_.tell, 1);
+
+   queue_->push_chunk(push_file_, value2, push_cb_);
+   BOOST_REQUIRE_EQUAL(queue_->count(), 1); // okay it's done
+   BOOST_REQUIRE_EQUAL(push_file_.tell, 2);
+
+   // even beginning a pop lowers the count...
+   queue_->pop(0, pop_cb_);
+   BOOST_REQUIRE_EQUAL(queue_->count(), 0);
+   BOOST_REQUIRE_EQUAL(pop_file_.tell, 1);
+   BOOST_REQUIRE_EQUAL(pop_value_, value1);
+   queue_->pop_chunk(pop_file_, pop_cb_);
+   BOOST_REQUIRE_EQUAL(pop_file_.tell, 2);
+   BOOST_REQUIRE_EQUAL(pop_value_, value2);
+   queue_->pop_chunk(pop_file_, pop_cb_);
+   BOOST_REQUIRE(pop_error_); // eof!
+
+   // finally, the delete
+   queue_->pop_end(pop_file_, true, pop_end_cb_);
+
+   // should be nothing left to pop
+   queue_->pop(0, pop_cb_);
+   BOOST_REQUIRE(pop_error_); // not_found!
+}
+
+// test that we can cancel a multi-chunked push
+BOOST_FIXTURE_TEST_CASE( test_push_cancel, fixtures::basic_queue )
+{
+   string value = "I ordered the salmon medium instead of medium well I didn’t want to ruin the magic";
+   queue_->push_reserve(push_file_, 2);
+   BOOST_REQUIRE_EQUAL(push_file_.tell, 0);
+
+   queue_->push_chunk(push_file_, value, push_cb_);
+   BOOST_REQUIRE_EQUAL(push_file_.tell, 1);
+
+   // double-check it's there:
+   --push_file_.tell;
+   queue_->pop_chunk(push_file_, pop_cb_);
+   BOOST_REQUIRE_EQUAL(push_file_.tell, 1); // brought it back up to 1
+   BOOST_REQUIRE(!pop_error_);
+   BOOST_REQUIRE_EQUAL(pop_value_, value);
+
+   queue_->push_cancel(push_file_, push_cancel_cb_);
+   BOOST_REQUIRE(!push_cancel_error_);
+
+   // make sure it's not there
+   --push_file_.tell;
+   queue_->pop_chunk(push_file_, pop_cb_);
+   BOOST_REQUIRE(pop_error_); // io_error
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()

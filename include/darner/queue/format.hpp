@@ -18,7 +18,7 @@ public:
 
    header_type() : chunk_beg(0), chunk_end(0), size(0) {}
    header_type(id_type _chunk_beg, id_type _chunk_end, size_type _size)
-   : chunk_beg(_chunk_end), chunk_end(_chunk_end), size(_size) {}
+   : chunk_beg(_chunk_beg), chunk_end(_chunk_end), size(_size) {}
    header_type(const std::string& buf)
    {
       *this = *reinterpret_cast<const header_type*>(buf.c_str());

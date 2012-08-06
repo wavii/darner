@@ -122,7 +122,6 @@ void queue::pop_chunk(file_type& file, const pop_callback& cb)
    if (file.tell >= file.header.chunk_end)
       return cb(asio::error::eof, file, value);
 
-   file.header = header_type(value);
    if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_CHUNK, file.tell).slice(), &value).ok())
       return cb(system::error_code(system::errc::io_error, system::system_category()), file, value);
    ++file.tell;
@@ -201,8 +200,8 @@ void queue::get_value(file_type& file, const pop_callback& cb)
       return cb(system::error_code(system::errc::io_error, system::system_category()), file, value);
    
    // check the escapes
-   if (value.size() > sizeof(header_type) && value.size() > 2 && value[value.size() - 1] == '\1'
-      && value[value.size() - 2] == '\0')
+   if (value.size() > sizeof(header_type) && value.size() > 2 && value[value.size() - 2] == '\1'
+      && value[value.size() - 1] == '\0')
    {
       file.header = header_type(value);
       if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_CHUNK, file.tell).slice(), &value).ok())
