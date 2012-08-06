@@ -20,6 +20,8 @@ ADD_EXECUTABLE(darner
 
 ADD_EXECUTABLE(bench_queue_flood
                bench/queue_flood
+               src/queue/queue
+               src/util/log
                )
 
 ADD_EXECUTABLE(test
