@@ -28,7 +28,7 @@ BOOST_FIXTURE_TEST_CASE( test_flush, fixtures::basic_request )
 // test that we get the num bytes for a set correctly
 BOOST_FIXTURE_TEST_CASE( test_set, fixtures::basic_request )
 {
-   BOOST_REQUIRE(parser_.parse(request_, string("SET foo+meow 31337\r\n")));
+   BOOST_REQUIRE(parser_.parse(request_, string("SET foo+meow 0 0 31337\r\n")));
    BOOST_REQUIRE_EQUAL(request_.type, darner::request::RT_SET);
    BOOST_REQUIRE_EQUAL(request_.queue, "foo+meow");
    BOOST_REQUIRE_EQUAL(request_.num_bytes, 31337);

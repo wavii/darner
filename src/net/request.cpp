@@ -27,6 +27,10 @@ request_grammar::request_grammar()
       lit("SET ")      [phoenix::ref(req.type) = request::RT_SET]
       >> key_name      [phoenix::ref(req.queue) = qi::_1]
       >> ' '
+      >> qi::uint_ // flags (ignored)
+      >> ' '
+      >> qi::uint_ // expiration (ignored for now)
+      >> ' '
       >> qi::uint_     [phoenix::ref(req.num_bytes) = qi::_1];
 
    get_option =
