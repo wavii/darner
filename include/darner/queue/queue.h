@@ -49,7 +49,7 @@ public:
     * manage the lifetime of the value passed to it - the caller must leave the value unchanged until after cb is
     * called.
     */
-   void push(std::string& value, const push_callback& cb);
+   void push(const std::string& value, const push_callback& cb);
 
    /*
     * reserve a swath of keys for pushing a multi-chunk value.
@@ -60,7 +60,7 @@ public:
     * pushes a chunk of a multi-chunk value into the queue.  as soon as the final chunk is pushed, the item
     * becomes available for popping.
     */
-   void push_chunk(file_type& file, std::string& value, const push_callback& cb);
+   void push_chunk(file_type& file, const std::string& value, const push_callback& cb);
 
    /*
     * cancels a multi-chunk push; deletes all the chunks

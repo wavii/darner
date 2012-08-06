@@ -42,14 +42,18 @@ queue::queue(asio::io_service& ios, const string& path)
    }
 }
 
-void queue::push(string& value, const push_callback& cb)
+void queue::push(const string& value, const push_callback& cb)
 {
+   file_type file;
+
    // values that end in 0 are escaped to (0, 0), so we can distinguish them from headers (which end in (1, 0))
    if (value[value.size() - 1] == '\0')
-      value.push_back('\0');
-
-   file_type file;
-   put_value(file, value, cb);
+   {
+      string new_value = value + '\0';
+      put_value(file, new_value, cb);
+   }
+   else
+      put_value(file, value, cb);
 }
 
 void queue::push_reserve(file_type& _return, size_type chunks)
@@ -58,7 +62,7 @@ void queue::push_reserve(file_type& _return, size_type chunks)
    chunks_head_.id += chunks;
 }
 
-void queue::push_chunk(file_type& file, string& value, const push_callback& cb)
+void queue::push_chunk(file_type& file, const string& value, const push_callback& cb)
 {
    if (file.tell >= file.header.chunk_end)
       return cb(asio::error::eof, file);

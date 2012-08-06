@@ -147,5 +147,16 @@ BOOST_FIXTURE_TEST_CASE( test_push_cancel, fixtures::basic_queue )
    BOOST_REQUIRE(pop_error_); // io_error
 }
 
+// test that we can push a value that ends in a null-zero
+BOOST_FIXTURE_TEST_CASE( test_push_zero, fixtures::basic_queue )
+{
+   string value = string("I'm sorry Taylor.") + '\0';
+   queue_->push(value, push_cb_);
+   queue_->pop(0, pop_cb_);
+   BOOST_REQUIRE(!push_error_);
+   BOOST_REQUIRE(!pop_error_);
+   BOOST_REQUIRE_EQUAL(pop_file_.id, 0);
+   BOOST_REQUIRE_EQUAL(pop_value_, value);
+}
 
 BOOST_AUTO_TEST_SUITE_END()
