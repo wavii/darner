@@ -182,10 +182,10 @@ bool queue::next_key(file_type & file)
       file.id = *returned_.begin();
       returned_.erase(returned_.begin());
    }
-   else if (queue_head_.id != queue_tail_.id)
+   else if (queue_tail_.id != queue_head_.id)
    {
-      file.id = queue_head_.id;
-      ++queue_head_.id;
+      file.id = queue_tail_.id;
+      ++queue_tail_.id;
    }
    else
       return false;

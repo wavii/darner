@@ -76,7 +76,7 @@ public:
       return leveldb::Slice(&buf_[0], buf_.size());
    }
 
-   bool operator< (const key_type& other) const
+   int compare(const key_type& other) const
    {
       if (type < other.type)
          return -1;

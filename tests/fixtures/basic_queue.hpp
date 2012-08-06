@@ -6,7 +6,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem/operations.hpp>
 
-#include "darner/queue.hpp"
+#include "darner/queue/queue.h"
 
 namespace fixtures {
 
@@ -16,7 +16,7 @@ class basic_queue
 public:
 
    basic_queue()
-   : push_cb_(boost::bind(&basic_queue::push_cb, this, _1)),
+   : push_cb_(boost::bind(&basic_queue::push_cb, this, _1, _2)),
      pop_cb_(boost::bind(&basic_queue::pop_cb, this, _1, _2, _3)),
      pop_end_cb_(boost::bind(&basic_queue::pop_end_cb, this, _1)),
      tmp_(boost::filesystem::temp_directory_path() / boost::filesystem::unique_path())
@@ -31,22 +31,23 @@ public:
       boost::filesystem::remove_all(tmp_);
    }
 
-   void delayed_push(const std::string& value, const boost::system::error_code& error)
+   void delayed_push(std::string& value, const boost::system::error_code& error)
    {
       queue_->push(value, push_cb_);
    }
 
 protected:
 
-   void push_cb(const boost::system::error_code& error)
+   void push_cb(const boost::system::error_code& error, const darner::file_type& file)
    {
       push_error_ = error;
+      push_file_ = file;
    }
 
-   void pop_cb(const boost::system::error_code& error, darner::queue::key_type key, const std::string& value)
+   void pop_cb(const boost::system::error_code& error, const darner::file_type& file, const std::string& value)
    {
       pop_error_ = error;
-      pop_key_ = key;
+      pop_file_ = file;
       pop_value_ = value;
    }
 
@@ -56,14 +57,16 @@ protected:
    }
 
    boost::system::error_code push_error_;
+   darner::file_type push_file_;
    boost::system::error_code pop_error_;
-   boost::system::error_code pop_end_error_;
-   darner::queue::key_type pop_key_;
+   darner::file_type pop_file_;
    std::string pop_value_;
+
+   boost::system::error_code pop_end_error_;
 
    darner::queue::push_callback push_cb_;
    darner::queue::pop_callback pop_cb_;
-   darner::queue::pop_end_callback pop_end_cb_;
+   darner::queue::success_callback pop_end_cb_;
    boost::asio::io_service ios_;
    boost::shared_ptr<darner::queue> queue_;
    boost::filesystem::path tmp_;

@@ -26,9 +26,10 @@ ADD_EXECUTABLE(bench_queue_flood
 
 ADD_EXECUTABLE(test
                src/net/request
+               src/queue/queue
+               src/util/log
                tests/queue
                tests/request
-               tests/fs
                tests/main
                )
 

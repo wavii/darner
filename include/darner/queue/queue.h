@@ -113,7 +113,7 @@ private:
    public:
       int Compare(const leveldb::Slice& a, const leveldb::Slice& b) const
       {
-         return key_type(a) < key_type(b);
+         return key_type(a).compare(key_type(b));
       }
       const char* Name() const { return "queue::comparator"; }
       void FindShortestSeparator(std::string*, const leveldb::Slice&) const {}
