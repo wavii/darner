@@ -93,7 +93,7 @@ int main(int argc, char * argv[])
       }
    }
 
-   if (!fs::exists(data_path))
+   if (!fs::exists(data_path) || !fs::is_directory(data_path))
    {
       cerr << "cannot find the data directory: " << data_path << endl;
       return 1;

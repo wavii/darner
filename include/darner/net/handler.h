@@ -7,8 +7,9 @@
 #include <boost/asio.hpp>
 
 #include "darner/util/log.h"
-#include "darner/net/request.h"
 #include "darner/util/stats.hpp"
+#include "darner/util/queue_map.hpp"
+#include "darner/net/request.h"
 
 namespace darner {
 
@@ -19,7 +20,7 @@ public:
    typedef boost::asio::ip::tcp::socket socket_type;
    typedef boost::shared_ptr<handler> ptr_type;
 
-   handler(boost::asio::io_service& ios, request_parser& parser, stats& _stats, size_t max_frame_size = 4096);
+   handler(boost::asio::io_service& ios, request_parser& parser, queue_map& queues, stats& _stats, size_t max_frame_size = 4096);
 
    ~handler();
 
@@ -58,6 +59,7 @@ private:
 
    socket_type socket_;
    request_parser& parser_;
+   queue_map& queues_;
    stats& stats_;
    boost::asio::streambuf in_buf_;
    std::string out_buf_;

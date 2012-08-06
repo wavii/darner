@@ -7,6 +7,7 @@
 
 #include "darner/util/log.h"
 #include "darner/util/stats.hpp"
+#include "darner/util/queue_map.hpp"
 #include "darner/net/request.h"
 #include "darner/net/handler.h"
 
@@ -22,11 +23,11 @@ public:
    server(const std::string& data_path,
           unsigned short listen_port,
           size_t num_workers)
-   : data_path_(data_path),
-     listen_port_(listen_port),
+   : listen_port_(listen_port),
      num_workers_(num_workers),
      acceptor_(ios_),
-     strand_(ios_)
+     strand_(ios_),
+     queues_(ios_, data_path)
    {
       // open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
       boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::tcp::v4(), listen_port_);
@@ -36,7 +37,7 @@ public:
       acceptor_.listen();
 
       // get our first conn ready
-      handler_ = handler::ptr_type(new handler(ios_, parser_, stats_));
+      handler_ = handler::ptr_type(new handler(ios_, parser_, queues_, stats_));
 
       // pump the first async accept into the loop
       acceptor_.async_accept(handler_->socket(),
@@ -71,7 +72,7 @@ private:
 
       handler_->start();
 
-      handler_ = handler::ptr_type(new handler(ios_, parser_, stats_));
+      handler_ = handler::ptr_type(new handler(ios_, parser_, queues_, stats_));
       acceptor_.async_accept(handler_->socket(),
          strand_.wrap(
             boost::bind(&server::handle_accept, this, boost::asio::placeholders::error)));
@@ -82,13 +83,13 @@ private:
       acceptor_.close();
    }
 
-   std::string data_path_;
    unsigned short listen_port_;
    size_t num_workers_;
 
    boost::asio::io_service ios_;
    boost::asio::ip::tcp::acceptor acceptor_;
    boost::asio::strand strand_; // to avoid close() and async_accept firing at the same time
+   queue_map queues_;
    request_parser parser_;
    stats stats_;
    handler::ptr_type handler_;

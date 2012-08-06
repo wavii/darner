@@ -8,10 +8,12 @@ using namespace darner;
 
 handler::handler(asio::io_service& ios,
                  request_parser& parser,
+                 queue_map& queues,
                  stats& _stats,
                  size_t max_frame_size /* = 4096 */)
    : socket_(ios),
      parser_(parser),
+     queues_(queues),
      stats_(_stats),
      in_buf_(max_frame_size)
 {
