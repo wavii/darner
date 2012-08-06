@@ -135,8 +135,8 @@ private:
    // a waiter timed out or was canceled
    void waiter_timeout(const boost::system::error_code& error, boost::ptr_list<waiter>::iterator waiter_it);
 
-   boost::scoped_ptr<leveldb::DB> journal_;
    boost::scoped_ptr<comparator> cmp_;
+   boost::scoped_ptr<leveldb::DB> journal_;
 
    // journal has queue keys and chunk keys
    // layout of queue keys in journal is:
