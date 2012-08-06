@@ -13,7 +13,8 @@ INCLUDE_DIRECTORIES(include /usr/local/include/thrift)
 ADD_EXECUTABLE(darner
                src/net/handler
                src/net/request
-               src/log
+               src/util/log
+               src/queue/queue
                src/main
                )
 
