@@ -17,6 +17,13 @@ BOOST_FIXTURE_TEST_CASE( test_stats, fixtures::basic_request )
    BOOST_REQUIRE_EQUAL(request_.type, darner::request::RT_STATS);
 }
 
+// test we don't care about case for commands
+BOOST_FIXTURE_TEST_CASE( test_case_invariant, fixtures::basic_request )
+{
+   BOOST_REQUIRE(parser_.parse(request_, string("sTaTs\r\n")));
+   BOOST_REQUIRE_EQUAL(request_.type, darner::request::RT_STATS);
+}
+
 // test that we get the queue name for a flush command correctly
 BOOST_FIXTURE_TEST_CASE( test_flush, fixtures::basic_request )
 {
