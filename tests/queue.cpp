@@ -89,12 +89,9 @@ BOOST_FIXTURE_TEST_CASE( test_multi_chunked, fixtures::basic_queue )
 {
    string value1 = "I don’t ever watch dramas on a plane... I don’t be wanting to reflect";
    string value2 = "I make awesome decisions in bike stores!!!";
-   queue_->push_reserve(push_file_, 2);
+   queue_->push_chunk(push_file_, 2, value1, push_cb_);
    BOOST_REQUIRE_EQUAL(push_file_.header.chunk_beg, 0);
    BOOST_REQUIRE_EQUAL(push_file_.header.chunk_end, 2);
-   BOOST_REQUIRE_EQUAL(push_file_.tell, 0);
-
-   queue_->push_chunk(push_file_, value1, push_cb_);
    BOOST_REQUIRE_EQUAL(queue_->count(), 0); // not ready yet...
    BOOST_REQUIRE_EQUAL(push_file_.tell, 1);
 
@@ -125,10 +122,7 @@ BOOST_FIXTURE_TEST_CASE( test_multi_chunked, fixtures::basic_queue )
 BOOST_FIXTURE_TEST_CASE( test_push_cancel, fixtures::basic_queue )
 {
    string value = "I ordered the salmon medium instead of medium well I didn’t want to ruin the magic";
-   queue_->push_reserve(push_file_, 2);
-   BOOST_REQUIRE_EQUAL(push_file_.tell, 0);
-
-   queue_->push_chunk(push_file_, value, push_cb_);
+   queue_->push_chunk(push_file_, 2, value, push_cb_);
    BOOST_REQUIRE_EQUAL(push_file_.tell, 1);
 
    // double-check it's there:

@@ -52,9 +52,9 @@ public:
    void push(const std::string& value, const push_callback& cb);
 
    /*
-    * reserve a swath of keys for pushing a multi-chunk value.
+    * reserve chunks and stores the reservation in file, and pushes the first chunk
     */
-   void push_reserve(file_type& _return, size_type chunks);
+   void push_chunk(file_type& file, size_type chunks, const std::string& value, const push_callback& cb);
 
    /*
     * pushes a chunk of a multi-chunk value into the queue.  as soon as the final chunk is pushed, the item

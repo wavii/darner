@@ -56,10 +56,11 @@ void queue::push(const string& value, const push_callback& cb)
       put_value(file, value, cb);
 }
 
-void queue::push_reserve(file_type& _return, size_type chunks)
+void queue::push_chunk(file_type& file, size_type chunks, const string& value, const push_callback& cb)
 {
-   _return = file_type(0, header_type(chunks_head_.id, chunks_head_.id + chunks, 0), chunks_head_.id);
+   file = file_type(0, header_type(chunks_head_.id, chunks_head_.id + chunks, 0), chunks_head_.id);
    chunks_head_.id += chunks;
+   push_chunk(file, value, cb);
 }
 
 void queue::push_chunk(file_type& file, const string& value, const push_callback& cb)
