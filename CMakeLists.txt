@@ -14,6 +14,8 @@ ADD_EXECUTABLE(darner
                src/net/handler
                src/net/request
                src/util/log
+               src/queue/iqstream
+               src/queue/oqstream
                src/queue/queue
                src/main
                )

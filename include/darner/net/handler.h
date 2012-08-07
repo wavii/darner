@@ -9,6 +9,8 @@
 
 #include "darner/util/log.h"
 #include "darner/util/stats.hpp"
+#include "darner/queue/iqstream.h"
+#include "darner/queue/oqstream.h"
 #include "darner/util/queue_map.hpp"
 #include "darner/net/request.h"
 
@@ -22,7 +24,7 @@ public:
    typedef boost::shared_ptr<handler> ptr_type;
 
    handler(boost::asio::io_service& ios, request_parser& parser, queue_map& queues, stats& _stats,
-      size_type chunk_size = 4096);
+      queue::size_type chunk_size = 4096);
 
    ~handler();
 
@@ -60,7 +62,7 @@ private:
 
    void set_on_read_chunk(const boost::system::error_code& e, size_t bytes_transferred);
 
-   void set_on_push_value(const boost::system::error_code& e, const file_type& file);
+   void set_on_push_value(const boost::system::error_code& e);
 
    void write_result(bool success, const char * msg);
 
@@ -69,7 +71,7 @@ private:
 
    void do_nothing(const boost::system::error_code& e);
 
-   const size_type chunk_size_;
+   const queue::size_type chunk_size_;
 
    socket_type socket_;
    request_parser& parser_;
@@ -78,9 +80,9 @@ private:
    boost::asio::streambuf in_;
    std::string buf_;
    request req_;
-   boost::optional<file_type> push_file_;
-   boost::optional<file_type> pop_file_;
-   size_type bytes_remaining_;
+
+   boost::optional<iqstream> pop_stream_;
+   boost::optional<oqstream> push_stream_;
 };
 
 } // darner

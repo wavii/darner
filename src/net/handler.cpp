@@ -10,7 +10,7 @@ handler::handler(asio::io_service& ios,
                  request_parser& parser,
                  queue_map& queues,
                  stats& _stats,
-                 size_t chunk_size /* = 4096 */)
+                 queue::size_type chunk_size /* = 4096 */)
    : chunk_size_(chunk_size),
      socket_(ios),
      parser_(parser),
@@ -121,9 +121,10 @@ void handler::flush_all()
 
 void handler::set()
 {
-   push_file_ = optional<file_type>();
-   bytes_remaining_ = req_.num_bytes;
-   size_type to_read = bytes_remaining_ > chunk_size_ ? chunk_size_ : bytes_remaining_ + 2; // last chunk? get \r\n too
+   // round up the number of chunks we need, and fetch \r\n if it's just one chunk
+   push_stream_ = in_place(ref(queues_[req_.queue]), (req_.num_bytes + chunk_size_ - 1) / chunk_size_);
+   queue::size_type bytes_remaining = req_.num_bytes - push_stream_->tell();
+   queue::size_type to_read = bytes_remaining > chunk_size_ ? chunk_size_ : bytes_remaining + 2;
    asio::async_read(
       socket_,
       in_,
@@ -138,25 +139,22 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
 {
    if (e)
    {
-      if (push_file_) // have a file?  nix it!
-         queues_.get_io_service().post(
-            bind(
-               &queue::push_cancel, &queues_[req_.queue], ref(*push_file_), socket_.get_io_service().wrap(
-               bind(
-                  &handler::do_nothing, shared_from_this(), _1
-               ))));
+      queues_.get_io_service().post(bind(
+         &oqstream::cancel, push_stream_, oqstream::success_callback(bind(
+            &handler::do_nothing, shared_from_this(), _1))));
 
       return log::ERROR("handler<%1%>::on_set_read_chunk: %2%", shared_from_this(), e.message());
    }
 
    asio::streambuf::const_buffers_type bufs = in_.data();
-   if (bytes_remaining_ <= chunk_size_) // last chunk!  make sure it ends with \r\n
+   queue::size_type bytes_remaining = req_.num_bytes - push_stream_->tell();
+   if (bytes_remaining <= chunk_size_) // last chunk!  make sure it ends with \r\n
    {
-      buf_.assign(buffers_begin(bufs) + bytes_remaining_, buffers_begin(bufs) + bytes_remaining_ + 2);
+      buf_.assign(buffers_begin(bufs) + bytes_remaining, buffers_begin(bufs) + bytes_remaining + 2);
       if (buf_ != "\r\n")
          return write_result(false, "CLIENT_ERROR bad data chunk\r\n");
-      buf_.assign(buffers_begin(bufs), buffers_begin(bufs) + bytes_remaining_);
-      in_.consume(bytes_remaining_ + 2);
+      buf_.assign(buffers_begin(bufs), buffers_begin(bufs) + bytes_remaining);
+      in_.consume(bytes_remaining + 2);
    }
    else
    {
@@ -164,59 +162,29 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
       in_.consume(chunk_size_);
    }
 
-   // three cases
-   if (req_.num_bytes <= chunk_size_) // simple single-chunk push
-   {
-      queues_.get_io_service().post(
-         bind(
-            &queue::push, &queues_[req_.queue], cref(buf_), socket_.get_io_service().wrap(
-               bind(
-                  &handler::set_on_push_value, shared_from_this(), _1, _2
-               ))));
-   }
-   else if (!push_file_) // first chunk, allocate a file
-   {
-      push_file_ = optional<file_type>(file_type());
-      size_type num_chunks = (req_.num_bytes + chunk_size_ - 1) / chunk_size_; // round up
-      // first chunk, get a file
-      queues_.get_io_service().post(
-         bind(
-            &queue::push_chunk, &queues_[req_.queue], ref(*push_file_), num_chunks, cref(buf_),
-            socket_.get_io_service().wrap(
-               bind(
-                  &handler::set_on_push_value, shared_from_this(), _1, _2
-               ))));
-   }
-   else // later chunk, use the allocated file
-   {
-      queues_.get_io_service().post(
-         bind(
-            &queue::push_chunk, &queues_[req_.queue], ref(*push_file_), cref(buf_), socket_.get_io_service().wrap(
-               bind(
-                  &handler::set_on_push_value, shared_from_this(), _1, _2
-               ))));
-   }
+   queues_.get_io_service().post(bind(
+      &oqstream::write, &*push_stream_, cref(buf_), socket_.get_io_service().wrap(bind(
+         &handler::set_on_push_value, shared_from_this(), _1))));
 }
 
-void handler::set_on_push_value(const boost::system::error_code& e, const file_type& file)
+void handler::set_on_push_value(const boost::system::error_code& e)
 {
    if (e)
    {
-      if (push_file_) // have a file?  nix it!
-         queues_.get_io_service().post(
-            bind(
-               &queue::push_cancel, &queues_[req_.queue], ref(*push_file_), socket_.get_io_service().wrap(
-               bind(
-                  &handler::do_nothing, shared_from_this(), _1
-               ))));
+      queues_.get_io_service().post(bind(
+         &oqstream::cancel, push_stream_, oqstream::success_callback(bind(
+            &handler::do_nothing, shared_from_this(), _1))));
+
+      log::ERROR("handler<%1%>::on_set_read_chunk: %2%", shared_from_this(), e.message());
       return write_result(false, ("SERVER_ERROR " + e.message() + "\r\n").c_str());
    }
 
-   if (push_file_->tell == push_file_->header.chunk_end) // all done!
+   if (push_stream_->tell() == req_.num_bytes) // all done!
       return write_result(true, "STORED\r\n");
 
-   bytes_remaining_ = req_.num_bytes - push_file_->header.size;
-   size_type to_read = bytes_remaining_ > chunk_size_ ? chunk_size_ : bytes_remaining_ + 2; // last chunk? get \r\n too
+   // second verse, same as the first
+   queue::size_type bytes_remaining = req_.num_bytes - push_stream_->tell();
+   queue::size_type to_read = bytes_remaining > chunk_size_ ? chunk_size_ : bytes_remaining + 2;
    asio::async_read(
       socket_,
       in_,
@@ -229,15 +197,6 @@ void handler::set_on_push_value(const boost::system::error_code& e, const file_t
 
 void handler::get()
 {
-   if (pop_file_ && req_.get_close || req_.get_abort)
-   {
-      queues_.get_io_service().post(
-         bind(
-            &queue::pop_end_, &queues_[req_.queue], ref(*push_file_), socket_.get_io_service().wrap(
-            bind(
-               &handler::do_nothing, shared_from_this(), _1
-            ))));
-   }
 }
 
 void handler::do_nothing(const system::error_code& e, size_t bytes_transferred)
