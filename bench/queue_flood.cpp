@@ -5,6 +5,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <darner/queue/queue.h>
+#include <darner/queue/istream.h>
+#include <darner/queue/ostream.h>
 
 using namespace std;
 using namespace boost;
@@ -16,12 +18,14 @@ class event_loop
 public:
 
    event_loop(size_t item_size, size_t num_pushpops)
-   : push_cb_(bind(&event_loop::push_cb, this, _1, _2)),
-     pop_cb_(bind(&event_loop::pop_cb, this, _1, _2, _3)),
+   : q_(ios_, "tmp"),
+     os_(q_, 1),
+     is_(q_, 100),
+     push_cb_(bind(&event_loop::push_cb, this, asio::placeholders::error)),
+     pop_cb_(bind(&event_loop::pop_cb, this, asio::placeholders::error)),
      pop_end_cb_(bind(&event_loop::pop_end_cb, this, asio::placeholders::error)),
      pushes_(num_pushpops),
-     pops_(num_pushpops),
-     q_(ios_, "tmp")
+     pops_(num_pushpops)
    {
       string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$^&*()";
       ostringstream oss;
@@ -32,39 +36,51 @@ public:
 
    void go()
    {
-      q_.push(value_, push_cb_);
-      q_.pop(0, pop_cb_);
+      os_.write(value_, push_cb_);
+      is_.read(result_, pop_cb_);
       ios_.run();
    }
 
 private:
 
-   void push_cb(const system::error_code& error, const file_type& file)
+   void push_cb(const system::error_code& error)
    {
       if (--pushes_ > 0)
-         ios_.post(bind(&queue::push, &q_, ref(value_), push_cb_));
+      {
+         new (&os_) darner::ostream(q_, 1);
+         ios_.post(bind(&darner::ostream::write, &os_, ref(value_), push_cb_));
+      }
    }
 
-   void pop_cb(const system::error_code& error, const file_type& file, std::string& value)
+   void pop_cb(const system::error_code& error)
    {
       if (!error)
-         q_.pop_end(file, true, pop_end_cb_);
-      if (--pops_ > 0)
-         ios_.post(bind(&queue::pop, &q_, 0, pop_cb_));
+         is_.close(true, pop_end_cb_);
    }
 
    void pop_end_cb(const system::error_code& error)
    {
+      if (result_ != value_)
+         std::cout << "WAAAA" << std::endl;
+      if (--pops_ > 0)
+      {
+         new (&is_) darner::istream(q_, 100);
+         ios_.post(bind(&darner::istream::read, &is_, ref(result_), pop_cb_));
+      }
    }
 
-   queue::push_callback push_cb_;
-   queue::pop_callback pop_cb_;
-   queue::success_callback pop_end_cb_;
-   string value_;
-   size_t pushes_;
-   size_t pops_;
    io_service ios_;
    queue q_;
+
+   darner::ostream os_;
+   darner::istream is_;
+   darner::ostream::success_callback push_cb_;
+   darner::istream::success_callback pop_cb_;
+   darner::istream::success_callback pop_end_cb_;
+   string value_;
+   string result_;
+   size_t pushes_;
+   size_t pops_;
 };
 
 // tests queue: simple flood, one producer one consumer
