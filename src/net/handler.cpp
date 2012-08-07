@@ -121,7 +121,7 @@ void handler::flush_all()
 
 void handler::set()
 {
-   file_ = file_type();
+   push_file_ = optional<file_type>();
    bytes_remaining_ = req_.num_bytes;
    size_type to_read = bytes_remaining_ > chunk_size_ ? chunk_size_ : bytes_remaining_ + 2; // last chunk? get \r\n too
    asio::async_read(
@@ -138,10 +138,10 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
 {
    if (e)
    {
-      if (file_.header.size) // have a file?  nix it!
+      if (push_file_) // have a file?  nix it!
          queues_.get_io_service().post(
             bind(
-               &queue::push_cancel, &queues_[req_.queue], ref(file_), socket_.get_io_service().wrap(
+               &queue::push_cancel, &queues_[req_.queue], ref(*push_file_), socket_.get_io_service().wrap(
                bind(
                   &handler::do_nothing, shared_from_this(), _1
                ))));
@@ -174,13 +174,15 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
                   &handler::set_on_push_value, shared_from_this(), _1, _2
                ))));
    }
-   else if (!file_.header.size) // first chunk, allocate a file
+   else if (!push_file_) // first chunk, allocate a file
    {
+      push_file_ = optional<file_type>(file_type());
       size_type num_chunks = (req_.num_bytes + chunk_size_ - 1) / chunk_size_; // round up
       // first chunk, get a file
       queues_.get_io_service().post(
          bind(
-            &queue::push_chunk, &queues_[req_.queue], ref(file_), num_chunks, cref(buf_), socket_.get_io_service().wrap(
+            &queue::push_chunk, &queues_[req_.queue], ref(*push_file_), num_chunks, cref(buf_),
+            socket_.get_io_service().wrap(
                bind(
                   &handler::set_on_push_value, shared_from_this(), _1, _2
                ))));
@@ -189,7 +191,7 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
    {
       queues_.get_io_service().post(
          bind(
-            &queue::push_chunk, &queues_[req_.queue], ref(file_), cref(buf_), socket_.get_io_service().wrap(
+            &queue::push_chunk, &queues_[req_.queue], ref(*push_file_), cref(buf_), socket_.get_io_service().wrap(
                bind(
                   &handler::set_on_push_value, shared_from_this(), _1, _2
                ))));
@@ -200,20 +202,20 @@ void handler::set_on_push_value(const boost::system::error_code& e, const file_t
 {
    if (e)
    {
-      if (file_.header.size) // have a file?  nix it!
+      if (push_file_) // have a file?  nix it!
          queues_.get_io_service().post(
             bind(
-               &queue::push_cancel, &queues_[req_.queue], ref(file_), socket_.get_io_service().wrap(
+               &queue::push_cancel, &queues_[req_.queue], ref(*push_file_), socket_.get_io_service().wrap(
                bind(
                   &handler::do_nothing, shared_from_this(), _1
                ))));
       return write_result(false, ("SERVER_ERROR " + e.message() + "\r\n").c_str());
    }
 
-   if (file_.tell == file_.header.chunk_end) // all done!
+   if (push_file_->tell == push_file_->header.chunk_end) // all done!
       return write_result(true, "STORED\r\n");
 
-   bytes_remaining_ = req_.num_bytes - file_.header.size;
+   bytes_remaining_ = req_.num_bytes - push_file_->header.size;
    size_type to_read = bytes_remaining_ > chunk_size_ ? chunk_size_ : bytes_remaining_ + 2; // last chunk? get \r\n too
    asio::async_read(
       socket_,
@@ -227,7 +229,15 @@ void handler::set_on_push_value(const boost::system::error_code& e, const file_t
 
 void handler::get()
 {
-
+   if (pop_file_ && req_.get_close || req_.get_abort)
+   {
+      queues_.get_io_service().post(
+         bind(
+            &queue::pop_end_, &queues_[req_.queue], ref(*push_file_), socket_.get_io_service().wrap(
+            bind(
+               &handler::do_nothing, shared_from_this(), _1
+            ))));
+   }
 }
 
 void handler::do_nothing(const system::error_code& e, size_t bytes_transferred)

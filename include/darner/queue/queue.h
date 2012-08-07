@@ -1,33 +1,30 @@
-#ifndef __DARNER_QUEUE_HPP__
-#define __DARNER_QUEUE_HPP__
+#ifndef __DARNER_QUEUE_H__
+#define __DARNER_QUEUE_H__
 
 #include <stdexcept>
 #include <set>
 
 #include <boost/ptr_container/ptr_list.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/optional.hpp>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <leveldb/db.h>
-#include <leveldb/iterator.h>
 #include <leveldb/comparator.h>
-
-#include "darner/queue/format.hpp"
 
 namespace darner {
 
 /*
  * queue is a fifo queue that is O(log(queue size / cache size)) for pushing/popping.  it boasts these features:
  *
- * - no blocking calls for the caller - blocking i/o can run on a separate i/o service thread
  * - an evented wait semantic for queue poppers
  * - items are first checked out, then later deleted or returned back into the queue
  * - large items are streamed in a chunk at a time
  *
- * queue will post events such as journal writes to a provided boost::asio io_service.  interrupting the
+ * queue will post events such as journal writes and waits to a provided boost::asio io_service.  interrupting the
  * io_service with pending events is okay - queue is never in an inconsistent state between io events.
  *
  * queue is not thread-safe, it assumes a single-thread calling and operating the provided io_service
@@ -36,54 +33,68 @@ class queue
 {
 public:
 
+   typedef boost::uint64_t id_type;
+   typedef boost::uint64_t size_type;
    typedef boost::function<void (const boost::system::error_code& error)> success_callback;
-   typedef boost::function<void (const boost::system::error_code& error, const file_type& file)> push_callback;
-   typedef boost::function<void (const boost::system::error_code& error, const file_type& file,
-      std::string& value)> pop_callback;
 
    // open or create the queue at the path
    queue(boost::asio::io_service& ios, const std::string& path);
 
-   /*
-    * push a single-chunk value into the queue.  calls cb after the write with a success code. this method does not
-    * manage the lifetime of the value passed to it - the caller must leave the value unchanged until after cb is
-    * called.
-    */
-   void push(const std::string& value, const push_callback& cb);
+public:
+
+   friend class istream;
+   friend class ostream;
+
+   // queue item points to chunk item via a small metadata header
+   class header_type
+   {
+   public:
+
+      header_type() : beg(0), end(0), size(0) {}
+      header_type(id_type _beg, id_type _end, size_type _size)
+      : beg(_beg), end(_end), size(_size) {}
+      header_type(const std::string& buf)
+      {
+         *this = *reinterpret_cast<const header_type*>(buf.c_str());
+      }
+
+      id_type beg;
+      id_type end;
+      size_type size;
+
+      const std::string& str() const;
+
+   private:
+
+      mutable std::string buf_;
+   };
+
+   // queue methods:
 
    /*
-    * reserve chunks and stores the reservation in file, and pushes the first chunk
+    * pushes a value to to the queue, calls cb after push with a success code, returns true for success,
+    * false if there was a problem writing to the journal
     */
-   void push_chunk(file_type& file, size_type chunks, const std::string& value, const push_callback& cb);
+   bool push(boost::optional<id_type>& result, const std::string& value);
 
    /*
-    * pushes a chunk of a multi-chunk value into the queue.  as soon as the final chunk is pushed, the item
-    * becomes available for popping.
+    * pushes a header to to the queue, calls cb after push with a success code, returns true for success,
+    * false if there was a problem writing to the journal
     */
-   void push_chunk(file_type& file, const std::string& value, const push_callback& cb);
+   bool push(boost::optional<id_type>& result, const header_type& value);
 
    /*
-    * cancels a multi-chunk push; deletes all the chunks
+    * begins the popping of an item.  if the item is a single chunk, pops the value, otherwise just pops the
+    * header.  if no items are available, will try to wait wait_ms milliseconds before failing to pop
     */
-   void push_cancel(const file_type& file, const success_callback& cb);
+   void pop_open(boost::optional<id_type>& result_id, boost::optional<header_type>& result_header,
+      std::string& result_value, size_type wait_ms, const success_callback& cb);
 
    /*
-    * reserves an item for popping off the back of the queue.  calls cb after at most wait_ms milliseconds with a
-    * success code, the item's key, and the item's value.  on failure, sets error as either timed_out if no
-    * items were available after wait_ms milliseconds, or io_error if there was a problem with the underlying journal
+    * finishes the popping of an item.  if remove = true, deletes the dang ol' item, otherwise returns it
+    * back into the queue
     */
-   void pop(size_t wait_ms, const pop_callback& cb);
-
-   /*
-    * reads the next chunk from an item to be popped
-    */
-   void pop_chunk(file_type& file, const pop_callback& cb);
-
-   /*
-    * finish the pop, either by deleting the item or returning back to the queue.  calls cb after the pop_end finishes
-    * with a success code. on failure, sets error as io_error if there was a problem with the underlying journal.
-    */
-   void pop_end(const file_type& file, bool remove, const success_callback& cb);
+   bool pop_close(bool remove, id_type id, const boost::optional<header_type>& header);
 
    /*
     * returns the number of items in the queue
@@ -91,19 +102,73 @@ public:
    size_type count();
 
    // TODO: consider also reporting a queue size
-   
-private:
 
-   // a waiter is a cheap struct that ties a callback to a deadline timer
+   // chunk methods:
+
+   /*
+    * returns a header with a range of reserved chunks
+    */
+   void reserve_chunks(boost::optional<header_type>& result, size_type chunks);
+
+   /*
+    * writes a chunk
+    */
+   bool write_chunk(const std::string& value, id_type chunk_key);
+
+   /*
+    * reads a chunk
+    */
+   bool read_chunk(std::string& result, id_type chunk_key);
+
+   /*
+    * removes all chunks referred to by a header
+    */
+   bool erase_chunks(const header_type& header);
+
+   class key_type
+   {
+   public:
+
+      enum  { KT_QUEUE = 1, KT_CHUNK = 2 }; // a key can be either a queue or a chunk type
+
+      key_type() : type(KT_QUEUE), id(0) {}
+
+      key_type(char _type, id_type _id) : type(_type), id(_id) {}
+
+      key_type(const leveldb::Slice& s)
+      : type(s.data()[sizeof(id_type)]), id(*reinterpret_cast<const id_type*>(s.data())) {}
+
+      leveldb::Slice slice() const;
+
+      int compare(const key_type& other) const;
+
+      unsigned char type;
+      id_type id;
+
+   private:
+
+      mutable std::vector<char> buf_;
+   };
+
+   // ties a set of results to a deadline timer
    struct waiter
    {
-      waiter(boost::asio::io_service& ios, size_t wait_ms, const pop_callback& _cb)
-      : cb(_cb),
+      waiter(boost::asio::io_service& ios, boost::optional<id_type>& _result_id,
+         boost::optional<header_type>& _result_header, std::string& _result_value, size_type wait_ms,
+         const success_callback& _cb)
+      : result_id(_result_id),
+        result_header(_result_header),
+        result_value(_result_value),
+        cb(_cb),
         timer(ios, boost::posix_time::milliseconds(wait_ms))
       {
       }
 
-      pop_callback cb;
+      boost::optional<id_type>& result_id;
+      boost::optional<header_type>& result_header;
+      std::string& result_value;
+      success_callback cb;
+
       boost::asio::deadline_timer timer;
    };
 
@@ -123,17 +188,14 @@ private:
    // any operation that mutates the queue or the waiter state should run this to crank any pending events
    void spin_waiters();
 
-   // fetch the next key and return true if there is one
-   bool next_key(file_type & file);
+   // return true and supply the next queue id if available
+   bool next_id(boost::optional<id_type> & id);
 
-   // fetch the value in the journal at key and pass it to cb
-   void get_value(file_type& file, const pop_callback& cb);
+   // fires either if timer times out, or is canceled
+   void waiter_timeout(const boost::system::error_code& e, boost::ptr_list<waiter>::iterator waiter_it);
 
-   // put the value into the journal, update file with the put location, and pass it onto cb
-   void put_value(file_type& file, const std::string& value, const push_callback& cb);
-
-   // a waiter timed out or was canceled
-   void waiter_timeout(const boost::system::error_code& error, boost::ptr_list<waiter>::iterator waiter_it);
+   // gets a value and optionally a header if it's multi-chunk
+   bool get_item(id_type id, boost::optional<header_type>& header, std::string& value);
 
    boost::scoped_ptr<comparator> cmp_;
    boost::scoped_ptr<leveldb::DB> journal_;
@@ -160,4 +222,4 @@ private:
 
 } // darner
 
-#endif // __DARNER_QUEUE_HPP__
+#endif // __DARNER_QUEUE_H__

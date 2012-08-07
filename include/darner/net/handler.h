@@ -3,6 +3,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
+#include <boost/optional.hpp>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 
@@ -77,7 +78,8 @@ private:
    boost::asio::streambuf in_;
    std::string buf_;
    request req_;
-   file_type file_;
+   boost::optional<file_type> push_file_;
+   boost::optional<file_type> pop_file_;
    size_type bytes_remaining_;
 };
 
