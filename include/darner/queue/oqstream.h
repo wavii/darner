@@ -1,5 +1,5 @@
-#ifndef __DARNER_QUEUE_OSTREAM_H__
-#define __DARNER_QUEUE_OSTREAM_H__
+#ifndef __DARNER_QUEUE_OQSTREAM_H__
+#define __DARNER_QUEUE_OQSTREAM_H__
 
 #include <boost/optional.hpp>
 #include <boost/function.hpp>
@@ -8,13 +8,13 @@
 
 namespace darner {
 
-class ostream
+class oqstream
 {
 public:
 
    typedef boost::function<void (const boost::system::error_code& error)> success_callback;
 
-   ostream(queue& _queue, queue::size_type chunks);
+   oqstream(queue& _queue, queue::size_type chunks);
 
    /*
     * writes a chunk of the item, and calls cb after at most wait_ms milliseconds with a success code.
@@ -23,7 +23,7 @@ public:
    void write(const std::string& value, const success_callback& cb);
 
    /*
-    * cancels the ostream write.  only available to mutli-chunks that haven't written all their chunks yet
+    * cancels the oqstream write.  only available to mutli-chunks that haven't written all their chunks yet
     */
    void cancel(const success_callback& cb);
 
@@ -45,4 +45,4 @@ private:
 
 } // darner
 
-#endif // __DARNER_QUEUE_OSTREAM_H__
+#endif // __DARNER_QUEUE_OQSTREAM_H__

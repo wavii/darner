@@ -7,8 +7,8 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "darner/queue/queue.h"
-#include "darner/queue/istream.h"
-#include "darner/queue/ostream.h"
+#include "darner/queue/iqstream.h"
+#include "darner/queue/oqstream.h"
 
 namespace fixtures {
 
@@ -19,8 +19,8 @@ public:
 
    basic_queue()
    : queue_success_cb_(boost::bind(&basic_queue::success_cb, this, _1)),
-     istream_success_cb_(boost::bind(&basic_queue::pop_cb, this, _1)),
-     ostream_success_cb_(boost::bind(&basic_queue::push_cb, this, _1)),
+     iqstream_success_cb_(boost::bind(&basic_queue::pop_cb, this, _1)),
+     oqstream_success_cb_(boost::bind(&basic_queue::push_cb, this, _1)),
      tmp_(boost::filesystem::temp_directory_path() / boost::filesystem::unique_path())
    {
       boost::filesystem::create_directories(tmp_);
@@ -35,7 +35,7 @@ public:
 
    void delayed_push(std::string& value, const boost::system::error_code& error)
    {
-      darner::ostream(*queue_, 1).write(value, ostream_success_cb_);
+      darner::oqstream(*queue_, 1).write(value, oqstream_success_cb_);
    }
 
 protected:
@@ -61,8 +61,8 @@ protected:
    std::string pop_value_;
 
    darner::queue::success_callback queue_success_cb_;
-   darner::istream::success_callback istream_success_cb_;
-   darner::ostream::success_callback ostream_success_cb_;
+   darner::iqstream::success_callback iqstream_success_cb_;
+   darner::oqstream::success_callback oqstream_success_cb_;
 
    boost::asio::io_service ios_;
    boost::shared_ptr<darner::queue> queue_;

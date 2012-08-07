@@ -5,8 +5,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <darner/queue/queue.h>
-#include <darner/queue/istream.h>
-#include <darner/queue/ostream.h>
+#include <darner/queue/iqstream.h>
+#include <darner/queue/oqstream.h>
 
 using namespace std;
 using namespace boost;
@@ -47,8 +47,8 @@ private:
    {
       if (--pushes_ > 0)
       {
-         new (&os_) darner::ostream(q_, 1);
-         ios_.post(bind(&darner::ostream::write, &os_, ref(value_), push_cb_));
+         new (&os_) oqstream(q_, 1);
+         ios_.post(bind(&oqstream::write, &os_, ref(value_), push_cb_));
       }
    }
 
@@ -64,19 +64,19 @@ private:
          std::cout << "WAAAA" << std::endl;
       if (--pops_ > 0)
       {
-         new (&is_) darner::istream(q_, 100);
-         ios_.post(bind(&darner::istream::read, &is_, ref(result_), pop_cb_));
+         new (&is_) iqstream(q_, 100);
+         ios_.post(bind(&iqstream::read, &is_, ref(result_), pop_cb_));
       }
    }
 
    io_service ios_;
    queue q_;
 
-   darner::ostream os_;
-   darner::istream is_;
-   darner::ostream::success_callback push_cb_;
-   darner::istream::success_callback pop_cb_;
-   darner::istream::success_callback pop_end_cb_;
+   oqstream os_;
+   iqstream is_;
+   oqstream::success_callback push_cb_;
+   iqstream::success_callback pop_cb_;
+   iqstream::success_callback pop_end_cb_;
    string value_;
    string result_;
    size_t pushes_;

@@ -1,5 +1,5 @@
-#ifndef __DARNER_QUEUE_ISTREAM_H__
-#define __DARNER_QUEUE_ISTREAM_H__
+#ifndef __DARNER_QUEUE_IQSTREAM_H__
+#define __DARNER_QUEUE_IQSTREAM_H__
 
 #include <boost/optional.hpp>
 #include <boost/function.hpp>
@@ -8,13 +8,13 @@
 
 namespace darner {
 
-class istream
+class iqstream
 {
 public:
 
    typedef boost::function<void (const boost::system::error_code& error)> success_callback;
 
-   istream(queue& _queue, queue::size_type wait_ms);
+   iqstream(queue& _queue, queue::size_type wait_ms);
 
    /*
     * on the first read, waits for an item to enter the queue, and calls cb after at most wait_ms milliseconds
@@ -24,7 +24,7 @@ public:
    void read(std::string& result, const success_callback& cb);
 
    /*
-    * closes the istream.  if remove, completes the pop of the item off the queue, otherwise returns it
+    * closes the iqstream.  if remove, completes the pop of the item off the queue, otherwise returns it
     */
    void close(bool remove, const success_callback& cb);
 
@@ -53,4 +53,4 @@ private:
 
 } // darner
 
-#endif // __DARNER_QUEUE_ISTREAM_H__
+#endif // __DARNER_QUEUE_IQSTREAM_H__

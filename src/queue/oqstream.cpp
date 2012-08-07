@@ -1,4 +1,4 @@
-#include "darner/queue/ostream.h"
+#include "darner/queue/oqstream.h"
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -9,7 +9,7 @@ using namespace std;
 using namespace boost;
 using namespace darner;
 
-darner::ostream::ostream(queue& _queue, queue::size_type chunks)
+oqstream::oqstream(queue& _queue, queue::size_type chunks)
 : queue_(_queue),
   chunks_(chunks),
   chunk_pos_(0),
@@ -17,7 +17,7 @@ darner::ostream::ostream(queue& _queue, queue::size_type chunks)
 {
 }
 
-void darner::ostream::write(const std::string& value, const success_callback& cb)
+void oqstream::write(const std::string& value, const success_callback& cb)
 {
    if (id_) // have an id already?  that's a paddlin'
       return cb(asio::error::eof);
@@ -43,7 +43,7 @@ void darner::ostream::write(const std::string& value, const success_callback& cb
    cb(system::error_code());
 }
 
-void darner::ostream::cancel(const success_callback& cb)
+void oqstream::cancel(const success_callback& cb)
 {
    if (id_) // can't cancel if we already pushed all the chunks
       return cb(asio::error::invalid_argument);

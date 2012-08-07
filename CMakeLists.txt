@@ -20,16 +20,16 @@ ADD_EXECUTABLE(darner
 
 ADD_EXECUTABLE(bench_queue_flood
                bench/queue_flood
-               src/queue/istream
-               src/queue/ostream
+               src/queue/iqstream
+               src/queue/oqstream
                src/queue/queue
                src/util/log
                )
 
 ADD_EXECUTABLE(test
                src/net/request
-               src/queue/istream
-               src/queue/ostream
+               src/queue/iqstream
+               src/queue/oqstream
                src/queue/queue
                src/util/log
                tests/queue

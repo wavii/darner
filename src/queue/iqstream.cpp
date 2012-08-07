@@ -1,4 +1,4 @@
-#include "darner/queue/istream.h"
+#include "darner/queue/iqstream.h"
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -9,7 +9,7 @@ using namespace std;
 using namespace boost;
 using namespace darner;
 
-darner::istream::istream(queue& _queue, queue::size_type wait_ms)
+iqstream::iqstream(queue& _queue, queue::size_type wait_ms)
 : queue_(_queue),
   wait_ms_(wait_ms),
   chunk_pos_(0),
@@ -17,7 +17,7 @@ darner::istream::istream(queue& _queue, queue::size_type wait_ms)
 {
 }
 
-void darner::istream::read(string& result, const success_callback& cb)
+void iqstream::read(string& result, const success_callback& cb)
 {
    if (id_) // have an id already?  probably just reading the next chunk
    {
@@ -29,10 +29,10 @@ void darner::istream::read(string& result, const success_callback& cb)
       tell_ += result.size();
    }
    else
-      queue_.pop_open(id_, header_, result, wait_ms_, bind(&darner::istream::on_open, this, ref(result), cref(cb), _1));
+      queue_.pop_open(id_, header_, result, wait_ms_, bind(&iqstream::on_open, this, ref(result), cref(cb), _1));
 }
 
-void darner::istream::close(bool remove, const success_callback& cb)
+void iqstream::close(bool remove, const success_callback& cb)
 {
    if (!id_)
       return cb(asio::error::not_found);
@@ -41,7 +41,7 @@ void darner::istream::close(bool remove, const success_callback& cb)
    cb(system::error_code());
 }
 
-void darner::istream::on_open(string& result, const success_callback& cb, const system::error_code& e)
+void iqstream::on_open(string& result, const success_callback& cb, const system::error_code& e)
 {
    if (e)
       return cb(e);
