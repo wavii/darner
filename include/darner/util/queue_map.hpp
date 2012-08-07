@@ -43,6 +43,11 @@ public:
       return *it->second;
    }
 
+   boost::asio::io_service& get_io_service()
+   {
+      return ios_;
+   }
+
 private:
 
    boost::ptr_map<std::string, queue> queues_;
