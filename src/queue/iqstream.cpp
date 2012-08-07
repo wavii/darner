@@ -29,7 +29,7 @@ void iqstream::read(string& result, const success_callback& cb)
       tell_ += result.size();
    }
    else
-      queue_.pop_open(id_, header_, result, wait_ms_, bind(&iqstream::on_open, this, ref(result), cref(cb), _1));
+      queue_.pop_open(id_, header_, result, wait_ms_, bind(&iqstream::on_open, this, ref(result), cb, _1));
 }
 
 void iqstream::close(bool remove, const success_callback& cb)
