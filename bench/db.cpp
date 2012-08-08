@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -18,22 +19,29 @@ namespace po = boost::program_options;
 struct results
 {
    results(size_t _item_size, size_t gets, size_t sets)
-   : get_set_ratio(static_cast<float>(gets) / sets), item_size(_item_size), gets_remaining(gets), sets_remaining(sets)
+   : bytes_in(0),
+     bytes_out(0),
+     get_set_ratio(static_cast<float>(gets) / sets),
+     item_size(_item_size),
+     gets_remaining(gets),
+     sets_remaining(sets)
    {
       string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$^&*()";
       ostringstream oss;
-      oss << "set test_queue 0 0 " << item_size << "\r\n";
+      oss << "set db_bench 0 0 " << item_size << "\r\n";
       for (; item_size != 0; --item_size)
          oss << chars[rand() % chars.size()];
       oss << "\r\n";
       set_request = oss.str();
-      get_request = "get test_queue\r\n";
+      get_request = "get db_bench\r\n";
       times.reserve(gets_remaining + sets_remaining);
    }
 
    string set_request;
    string get_request;
    vector<unsigned int> times;
+   size_t bytes_in;
+   size_t bytes_out;
    float get_set_ratio;
    size_t item_size;
    size_t gets_remaining;
@@ -60,12 +68,26 @@ public:
    {
       socket_.async_connect(
          ip::tcp::endpoint(ip::address::from_string(host_), port_),
-         bind(&session::do_get_or_set, shared_from_this(), _1));
+         bind(&session::on_connect, shared_from_this(), _1));
    }
 
 private:
 
-   void do_get_or_set(const system::error_code& e)
+   void fail(const std::string& method, const system::error_code& e)
+   {
+      cerr << "[ERROR] " << method << ": " << e.message() << endl;
+   }
+
+   void on_connect(const system::error_code& e)
+   {
+      if (e)
+         return fail("on_connect", e);
+
+      socket_.set_option(ip::tcp::no_delay(true));
+      do_get_or_set();
+   }
+
+   void do_get_or_set()
    {
       if (results_.gets_remaining)
       {
@@ -84,23 +106,33 @@ private:
    {
       --results_.gets_remaining;
       begin_ = posix_time::microsec_clock::local_time();
+
       async_write(socket_, buffer(results_.get_request), bind(&session::get_on_write, shared_from_this(), _1, _2));
    }
 
    void get_on_write(const system::error_code& e, size_t bytes_transferred)
    {
+      if (e)
+         return fail("get_on_write", e);
+
+      results_.bytes_out += bytes_transferred;
+
       async_read_until(socket_, in_, '\n', bind(&session::get_on_header, shared_from_this(), _1, _2));
    }
 
    void get_on_header(const system::error_code& e, size_t bytes_transferred)
    {
       if (e)
-         return;
+         return fail("get_on_header", e);
+
+      results_.bytes_in += bytes_transferred;
+
       asio::streambuf::const_buffers_type bufs = in_.data();
       std::string header(buffers_begin(bufs), buffers_begin(bufs) + bytes_transferred);
       in_.consume(bytes_transferred);
+
       if (header == "END\r\n")
-         do_get_or_set(system::error_code());
+         do_get_or_set();
       else
       {
          size_t required = results_.item_size + 7; // item + \r\nEND\r\n
@@ -113,23 +145,30 @@ private:
    void get_on_value(const system::error_code& e, size_t bytes_transferred)
    {
       if (e)
-         return;
-      results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_nanoseconds());
+         return fail("get_on_value", e);
+
+      results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
+      results_.bytes_in += bytes_transferred;
+
       in_.consume(in_.size());
-      do_get_or_set(system::error_code());
+      do_get_or_set();
    }
 
    void do_set()
    {
       --results_.sets_remaining;
       begin_ = boost::posix_time::microsec_clock::local_time();
+
       async_write(socket_, buffer(results_.set_request), bind(&session::set_on_write, shared_from_this(), _1, _2));
    }
 
    void set_on_write(const system::error_code& e, size_t bytes_transferred)
    {
       if (e)
-         return;
+         return fail("set_on_write", e);
+
+      results_.bytes_out += bytes_transferred;
+
       size_t required = 8; // STORED\r\n
       async_read(
          socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
@@ -139,10 +178,13 @@ private:
    void set_on_response(const system::error_code& e, size_t bytes_transferred)
    {
       if (e)
-         return;
-      results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_nanoseconds());
+         return fail("set_on_response", e);
+
+      results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
+      results_.bytes_in += bytes_transferred;
+
       in_.consume(in_.size());
-      do_get_or_set(system::error_code());
+      do_get_or_set();
    }   
 
    socket_type socket_;
@@ -214,9 +256,49 @@ int main(int argc, char * argv[])
    io_service ios;
    for (size_t i = 0; i != workers; ++i)
       session::ptr_type(new session(ios, r, host, port))->start();
+
+   posix_time::ptime begin = posix_time::microsec_clock::local_time();
+
    ios.run();
 
-   cout << r.gets_remaining << endl;
+   posix_time::ptime end = posix_time::microsec_clock::local_time();
+
+   float elapsed_seconds = (end - begin).total_milliseconds() / 1000.0;
+
+   sort(r.times.begin(), r.times.end());
+
+   cout << left;
+   cout << setw(24) << "Concurrency Level:"  << workers << endl;
+   cout << setw(24) << "Gets:" << num_gets << endl;
+   cout << setw(24) << "Sets:" << num_sets << endl;
+   cout << setw(24) << "Time taken for tests:" << elapsed_seconds << " seconds" << endl;
+   cout << setw(24) << "Bytes read:" << r.bytes_in << " bytes" << endl;
+   cout << setw(24) << "Read rate:" << r.bytes_in / elapsed_seconds / 1024  << " Kbytes/sec" << endl;
+   cout << setw(24) << "Bytes written:" << r.bytes_out << " bytes" << endl;
+   cout << setw(24) << "Write rate:" << r.bytes_out / elapsed_seconds / 1024  << " Kbytes/sec" << endl;
+
+   if (!r.times.empty())
+   {
+      float avg = 0;
+
+      for (vector<unsigned int>::const_iterator it = r.times.begin(); it != r.times.end(); ++it)
+         avg += *it;
+      avg /= r.times.size();
+
+      cout << setw(24) << "Time per request:" << avg << " [us] (mean)" << endl << endl;
+      cout << "Percentage of the requests served within a certain time (us)" << endl;
+      cout << setw(10) << "  50%:" << r.times[r.times.size() * 50 / 100] << endl;
+      cout << setw(10) << "  66%:" << r.times[r.times.size() * 66 / 100] << endl;
+      cout << setw(10) << "  75%:" << r.times[r.times.size() * 75 / 100] << endl;
+      cout << setw(10) << "  80%:" << r.times[r.times.size() * 80 / 100] << endl;
+      cout << setw(10) << "  90%:" << r.times[r.times.size() * 90 / 100] << endl;
+      cout << setw(10) << "  95%:" << r.times[r.times.size() * 95 / 100] << endl;
+      cout << setw(10) << "  98%:" << r.times[r.times.size() * 98 / 100] << endl;
+      cout << setw(10) << "  99%:" << r.times[r.times.size() * 99 / 100] << endl;
+      cout << setw(10) << " 100%:" << r.times[r.times.size() - 1] << " (longest request)" << endl;
+   }
+
+
 
    return 0;
 }
