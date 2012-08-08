@@ -62,11 +62,24 @@ private:
 
    void set_on_read_chunk(const boost::system::error_code& e, size_t bytes_transferred);
 
-   void set_on_push_value(const boost::system::error_code& e);
+   void set_on_write_chunk(const boost::system::error_code& e);
 
-   void write_result(bool success, const char * msg);
+   // get loop:
 
-   // empty bail-out functions, usually at the end of an error
+   void get_on_pop_close_pre(const boost::system::error_code& e);
+
+   void get_on_read_first_chunk(const boost::system::error_code& e);
+
+   void get_on_read_next_chunk(const boost::system::error_code& e);
+
+   void get_on_write_chunk(const boost::system::error_code& e, size_t bytes_transferred);
+
+   void get_on_pop_close_post(const boost::system::error_code& e);
+
+   // utils
+
+   void write_result(bool success, const std::string& msg);
+
    void do_nothing(const boost::system::error_code& e, size_t bytes_transferred);
 
    void do_nothing(const boost::system::error_code& e);
@@ -78,6 +91,7 @@ private:
    queue_map& queues_;
    stats& stats_;
    boost::asio::streambuf in_;
+   std::string header_buf_;
    std::string buf_;
    request req_;
 
