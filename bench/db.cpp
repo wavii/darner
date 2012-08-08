@@ -1,7 +1,11 @@
 #include <iostream>
 
+#include <string>
+#include <vector>
+
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
@@ -13,16 +17,27 @@ namespace po = boost::program_options;
 
 struct results
 {
-   results(size_t item_size)
+   results(size_t _item_size, size_t gets, size_t sets)
+   : get_set_ratio(static_cast<float>(gets) / sets), item_size(_item_size), gets_remaining(gets), sets_remaining(sets)
    {
       string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$^&*()";
       ostringstream oss;
+      oss << "set test_queue 0 0 " << item_size << "\r\n";
       for (; item_size != 0; --item_size)
          oss << chars[rand() % chars.size()];
-      item = oss.str();
+      oss << "\r\n";
+      set_request = oss.str();
+      get_request = "get test_queue\r\n";
+      times.reserve(gets_remaining + sets_remaining);
    }
 
-   string item;
+   string set_request;
+   string get_request;
+   vector<unsigned int> times;
+   float get_set_ratio;
+   size_t item_size;
+   size_t gets_remaining;
+   size_t sets_remaining;
 };
 
 class session : public enable_shared_from_this<session>
@@ -45,17 +60,94 @@ public:
    {
       socket_.async_connect(
          ip::tcp::endpoint(ip::address::from_string(host_), port_),
-         bind(&session::handle_connect, shared_from_this(), _1));
+         bind(&session::do_get_or_set, shared_from_this(), _1));
    }
 
 private:
 
-   void handle_connect(const system::error_code& e)
+   void do_get_or_set(const system::error_code& e)
    {
-
+      if (results_.gets_remaining)
+      {
+         if (!results_.sets_remaining)
+            do_get();
+         else if (static_cast<float>(results_.gets_remaining) / results_.sets_remaining > results_.get_set_ratio)
+            do_get();
+         else
+            do_set();
+      }
+      else if (results_.sets_remaining)
+         do_set();
    }
 
+   void do_get()
+   {
+      --results_.gets_remaining;
+      begin_ = posix_time::microsec_clock::local_time();
+      async_write(socket_, buffer(results_.get_request), bind(&session::get_on_write, shared_from_this(), _1, _2));
+   }
+
+   void get_on_write(const system::error_code& e, size_t bytes_transferred)
+   {
+      async_read_until(socket_, in_, '\n', bind(&session::get_on_header, shared_from_this(), _1, _2));
+   }
+
+   void get_on_header(const system::error_code& e, size_t bytes_transferred)
+   {
+      if (e)
+         return;
+      asio::streambuf::const_buffers_type bufs = in_.data();
+      std::string header(buffers_begin(bufs), buffers_begin(bufs) + bytes_transferred);
+      in_.consume(bytes_transferred);
+      if (header == "END\r\n")
+         do_get_or_set(system::error_code());
+      else
+      {
+         size_t required = results_.item_size + 7; // item + \r\nEND\r\n
+         async_read(
+            socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
+            bind(&session::get_on_value, shared_from_this(), _1, _2));
+      }
+   }
+
+   void get_on_value(const system::error_code& e, size_t bytes_transferred)
+   {
+      if (e)
+         return;
+      results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_nanoseconds());
+      in_.consume(in_.size());
+      do_get_or_set(system::error_code());
+   }
+
+   void do_set()
+   {
+      --results_.sets_remaining;
+      begin_ = boost::posix_time::microsec_clock::local_time();
+      async_write(socket_, buffer(results_.set_request), bind(&session::set_on_write, shared_from_this(), _1, _2));
+   }
+
+   void set_on_write(const system::error_code& e, size_t bytes_transferred)
+   {
+      if (e)
+         return;
+      size_t required = 8; // STORED\r\n
+      async_read(
+         socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
+         bind(&session::set_on_response, shared_from_this(), _1, _2));
+   }
+
+   void set_on_response(const system::error_code& e, size_t bytes_transferred)
+   {
+      if (e)
+         return;
+      results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_nanoseconds());
+      in_.consume(in_.size());
+      do_get_or_set(system::error_code());
+   }   
+
    socket_type socket_;
+   asio::streambuf in_;
+   posix_time::ptime begin_;
 
    io_service& ios_;
    results& results_;
@@ -118,11 +210,13 @@ int main(int argc, char * argv[])
       return 1;
    }
 
-   results r(item_size);
+   results r(item_size, num_gets, num_sets);
    io_service ios;
    for (size_t i = 0; i != workers; ++i)
       session::ptr_type(new session(ios, r, host, port))->start();
    ios.run();
+
+   cout << r.gets_remaining << endl;
 
    return 0;
 }
