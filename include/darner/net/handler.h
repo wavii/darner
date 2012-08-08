@@ -78,9 +78,10 @@ private:
 
    // utils
 
-   void write_result(bool success, const std::string& msg);
+   // call done after a successful call or a failure. on fail, ensures the handler cleans up
+   void done(bool success, const std::string& msg = "");
 
-   void do_nothing(const boost::system::error_code& e, size_t bytes_transferred);
+   void finalize(const boost::system::error_code& e, size_t bytes_transferred);
 
    void do_nothing(const boost::system::error_code& e);
 

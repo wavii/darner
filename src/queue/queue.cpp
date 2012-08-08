@@ -160,7 +160,7 @@ void queue::spin_waiters()
          break;
       ptr_list<waiter>::auto_type waiter = waiters_.release(waiters_.begin());
       waiter->timer.cancel();
-      waiter->result_id = result_id;
+      waiter->result_id = *result_id;
       if (!get_item(*waiter->result_id, waiter->result_header, waiter->result_value))
          return waiter->cb(system::error_code(system::errc::io_error, system::system_category()));
       waiter->cb(system::error_code());

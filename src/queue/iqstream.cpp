@@ -36,8 +36,10 @@ void iqstream::close(bool remove, const success_callback& cb)
 {
    if (!id_)
       return cb(asio::error::not_found);
+
    if (!queue_.pop_close(remove, *id_, header_))
       return cb(system::error_code(system::errc::io_error, system::system_category()));
+
    cb(system::error_code());
 }
 

@@ -189,7 +189,7 @@ public:
    void spin_waiters();
 
    // return true and supply the next queue id if available
-   bool next_id(boost::optional<id_type> & id);
+   bool next_id(boost::optional<id_type>& id);
 
    // fires either if timer times out, or is canceled
    void waiter_timeout(const boost::system::error_code& e, boost::ptr_list<waiter>::iterator waiter_it);
