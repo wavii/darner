@@ -208,7 +208,10 @@ void handler::get_on_pop_close_pre(const boost::system::error_code& e)
 void handler::get_on_read_first_chunk(const boost::system::error_code& e)
 {
    if (e == asio::error::timed_out || e == asio::error::not_found)
+   {
+      pop_stream_.reset();
       return done(true, "END\r\n");
+   }
    else if (e)
    {
       log::ERROR("handler<%1%>::get_on_read_first_chunk: %2%", shared_from_this(), e.message());
