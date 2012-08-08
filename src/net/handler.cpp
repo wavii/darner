@@ -194,6 +194,8 @@ void handler::get_on_pop_close_pre(const boost::system::error_code& e)
       return done(false, "SERVER_ERROR " + e.message() + "\r\n");
    }
 
+   pop_stream_.reset();
+
    if (req_.get_abort)
       return done(true, "END\r\n"); // aborts go no further
 
