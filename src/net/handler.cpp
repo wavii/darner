@@ -43,7 +43,7 @@ void handler::read_request(const system::error_code& e, size_t bytes_transferred
 {
    if (e)
    {
-      log::ERROR("handler<%1%>::handle_read_request: %2%", shared_from_this(), e.message());
+      log::ERROR("handler<%1%>::read_request: %2%", shared_from_this(), e.message());
       return done(false);
    }
 
