@@ -20,12 +20,8 @@ ADD_EXECUTABLE(darner
                src/main
                )
 
-ADD_EXECUTABLE(bench_queue_flood
-               bench/queue_flood
-               src/queue/iqstream
-               src/queue/oqstream
-               src/queue/queue
-               src/util/log
+ADD_EXECUTABLE(db
+               bench/db
                )
 
 ADD_EXECUTABLE(test
@@ -42,5 +38,5 @@ ADD_EXECUTABLE(test
 FIND_PACKAGE(Boost 1.46.1 COMPONENTS thread system program_options unit_test_framework filesystem)
 
 TARGET_LINK_LIBRARIES(darner pthread ${Boost_LIBRARIES} leveldb)
-TARGET_LINK_LIBRARIES(bench_queue_flood pthread ${Boost_LIBRARIES} leveldb)
+TARGET_LINK_LIBRARIES(db ${Boost_LIBRARIES})
 TARGET_LINK_LIBRARIES(test pthread ${Boost_LIBRARIES} leveldb)

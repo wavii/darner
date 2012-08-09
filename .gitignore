@@ -8,7 +8,7 @@ cmake_install.cmake
 # makefile output
 darner
 !include/darner
-bench_queue_flood
+db
 test
 # sublimetext 2 stuff
 *.sublime-project
