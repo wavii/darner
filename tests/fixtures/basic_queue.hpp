@@ -6,7 +6,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem/operations.hpp>
 
-#include "darner/queue.hpp"
+#include "darner/queue/queue.h"
+#include "darner/queue/iqstream.h"
+#include "darner/queue/oqstream.h"
 
 namespace fixtures {
 
@@ -16,9 +18,9 @@ class basic_queue
 public:
 
    basic_queue()
-   : push_cb_(boost::bind(&basic_queue::push_cb, this, _1)),
-     pop_cb_(boost::bind(&basic_queue::pop_cb, this, _1, _2, _3)),
-     pop_end_cb_(boost::bind(&basic_queue::pop_end_cb, this, _1)),
+   : queue_success_cb_(boost::bind(&basic_queue::success_cb, this, _1)),
+     iqstream_success_cb_(boost::bind(&basic_queue::pop_cb, this, _1)),
+     oqstream_success_cb_(boost::bind(&basic_queue::push_cb, this, _1)),
      tmp_(boost::filesystem::temp_directory_path() / boost::filesystem::unique_path())
    {
       boost::filesystem::create_directories(tmp_);
@@ -31,39 +33,37 @@ public:
       boost::filesystem::remove_all(tmp_);
    }
 
-   void delayed_push(const std::string& value, const boost::system::error_code& error)
+   void delayed_push(std::string& value, const boost::system::error_code& error)
    {
-      queue_->push(value, push_cb_);
+      darner::oqstream(*queue_, 1).write(value, oqstream_success_cb_);
    }
 
 protected:
+
+   void success_cb(const boost::system::error_code& error)
+   {
+      error_ = error;
+   }
 
    void push_cb(const boost::system::error_code& error)
    {
       push_error_ = error;
    }
 
-   void pop_cb(const boost::system::error_code& error, darner::queue::key_type key, const std::string& value)
+   void pop_cb(const boost::system::error_code& error)
    {
       pop_error_ = error;
-      pop_key_ = key;
-      pop_value_ = value;
    }
 
-   void pop_end_cb(const boost::system::error_code& error)
-   {
-      pop_end_error_ = error;
-   }
-
+   boost::system::error_code error_;
    boost::system::error_code push_error_;
    boost::system::error_code pop_error_;
-   boost::system::error_code pop_end_error_;
-   darner::queue::key_type pop_key_;
    std::string pop_value_;
 
-   darner::queue::push_callback push_cb_;
-   darner::queue::pop_callback pop_cb_;
-   darner::queue::pop_end_callback pop_end_cb_;
+   darner::queue::success_callback queue_success_cb_;
+   darner::iqstream::success_callback iqstream_success_cb_;
+   darner::oqstream::success_callback oqstream_success_cb_;
+
    boost::asio::io_service ios_;
    boost::shared_ptr<darner::queue> queue_;
    boost::filesystem::path tmp_;
