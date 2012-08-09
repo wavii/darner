@@ -8,7 +8,7 @@ CMAKE_POLICY(SET CMP0005 NEW) # don't complain about escaping the double-quotes 
 
 ADD_DEFINITIONS(-Wall -Wno-return-type -O2 -g -DNDEBUG -DDARNER_VERSION="${DARNER_VERSION}")
 
-INCLUDE_DIRECTORIES(include /usr/local/include/thrift)
+INCLUDE_DIRECTORIES(include)
 
 ADD_EXECUTABLE(darner
                src/net/handler
