@@ -55,7 +55,7 @@ public:
    typedef ip::tcp::socket socket_type;
    typedef shared_ptr<session> ptr_type;
 
-   session(io_service& ios, results& _results, const std::string& host, size_t port)
+   session(io_service& ios, results& _results, const string& host, size_t port)
    : socket_(ios),
      ios_(ios),
      results_(_results),
@@ -73,7 +73,12 @@ public:
 
 private:
 
-   void fail(const std::string& method, const system::error_code& e)
+   void fail(const string& method, const string& message)
+   {
+      cerr << "[ERROR] " << method << ": " << message << endl;
+   }
+
+   void fail(const string& method, const system::error_code& e)
    {
       cerr << "[ERROR] " << method << ": " << e.message() << endl;
    }
@@ -128,14 +133,20 @@ private:
       results_.bytes_in += bytes_transferred;
 
       asio::streambuf::const_buffers_type bufs = in_.data();
-      std::string header(buffers_begin(bufs), buffers_begin(bufs) + bytes_transferred);
+      string header(buffers_begin(bufs), buffers_begin(bufs) + bytes_transferred);
       in_.consume(bytes_transferred);
 
       if (header == "END\r\n")
+      {
+         results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
          do_get_or_set();
+      }
       else
       {
-         size_t required = results_.item_size + 7; // item + \r\nEND\r\n
+         size_t pos = header.rfind(' ');
+         if (pos == string::npos)
+            return fail("get_on_header", "bad header");
+         size_t required = atoi(header.c_str() + pos + 1);
          async_read(
             socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
             bind(&session::get_on_value, shared_from_this(), _1, _2));
@@ -148,7 +159,7 @@ private:
          return fail("get_on_value", e);
 
       results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
-      results_.bytes_in += bytes_transferred;
+      results_.bytes_in += in_.size();
 
       in_.consume(in_.size());
       do_get_or_set();
@@ -183,7 +194,7 @@ private:
       results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
       results_.bytes_in += bytes_transferred;
 
-      in_.consume(in_.size());
+      in_.consume(bytes_transferred);
       do_get_or_set();
    }   
 
@@ -285,20 +296,15 @@ int main(int argc, char * argv[])
          avg += *it;
       avg /= r.times.size();
 
+      cout << setw(24) << "Requests per second:" << (num_gets + num_sets) / elapsed_seconds << " [us] (mean)" << endl;
       cout << setw(24) << "Time per request:" << avg << " [us] (mean)" << endl << endl;
       cout << "Percentage of the requests served within a certain time (us)" << endl;
-      cout << setw(10) << "  50%:" << r.times[r.times.size() * 50 / 100] << endl;
-      cout << setw(10) << "  66%:" << r.times[r.times.size() * 66 / 100] << endl;
-      cout << setw(10) << "  75%:" << r.times[r.times.size() * 75 / 100] << endl;
-      cout << setw(10) << "  80%:" << r.times[r.times.size() * 80 / 100] << endl;
-      cout << setw(10) << "  90%:" << r.times[r.times.size() * 90 / 100] << endl;
-      cout << setw(10) << "  95%:" << r.times[r.times.size() * 95 / 100] << endl;
-      cout << setw(10) << "  98%:" << r.times[r.times.size() * 98 / 100] << endl;
-      cout << setw(10) << "  99%:" << r.times[r.times.size() * 99 / 100] << endl;
-      cout << setw(10) << " 100%:" << r.times[r.times.size() - 1] << " (longest request)" << endl;
+
+      int percentages[] = {50, 66, 75, 80, 90, 95, 98, 99};
+      for (size_t i = 0; i < sizeof(percentages) / sizeof(int); ++i)
+         cout << "  " <<  percentages[i] << "%:    " << r.times[r.times.size() * percentages[i] / 100] << endl;
+      cout << " 100%:    " << r.times[r.times.size() - 1] << " (longest request)" << endl;
    }
-
-
 
    return 0;
 }
