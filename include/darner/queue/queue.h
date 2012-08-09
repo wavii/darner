@@ -41,10 +41,15 @@ public:
    // open or create the queue at the path
    queue(boost::asio::io_service& ios, const std::string& path);
 
-public:
+   // returns the number of items in the queue
+   size_type count();
 
-   friend class istream;
-   friend class ostream;
+   // TODO: consider also reporting a queue size
+
+private:
+
+   friend class iqstream;
+   friend class oqstream;
 
    // queue item points to chunk item via a small metadata header
    class header_type
@@ -73,20 +78,19 @@ public:
    // queue methods:
 
    /*
-    * pushes a value to to the queue, calls cb after push with a success code, returns true for success,
-    * false if there was a problem writing to the journal
+    * pushes a value to to the queue. returns true for success, false if there was a problem writing to the journal
     */
    bool push(boost::optional<id_type>& result, const std::string& value);
 
    /*
-    * pushes a header to to the queue, calls cb after push with a success code, returns true for success,
-    * false if there was a problem writing to the journal
+    * pushes a header to to the queue.  call this after inserting a range of data chunks.
     */
    bool push(boost::optional<id_type>& result, const header_type& value);
 
    /*
     * begins the popping of an item.  if the item is a single chunk, pops the value, otherwise just pops the
-    * header.  if no items are available, will try to wait wait_ms milliseconds before failing to pop
+    * header.  will wait wait_ms milliseconds for an item to become available before either returning a succes
+    * or timeout status to the callback cb
     */
    void pop_open(boost::optional<id_type>& result_id, boost::optional<header_type>& result_header,
       std::string& result_value, size_type wait_ms, const success_callback& cb);
@@ -96,13 +100,6 @@ public:
     * back into the queue
     */
    bool pop_close(bool remove, id_type id, const boost::optional<header_type>& header);
-
-   /*
-    * returns the number of items in the queue
-    */
-   size_type count();
-
-   // TODO: consider also reporting a queue size
 
    // chunk methods:
 
