@@ -222,10 +222,9 @@ const string& queue::header_type::str() const
 
 leveldb::Slice queue::key_type::slice() const
 {
-   buf_.resize(sizeof(id_type) + 1);
    *reinterpret_cast<id_type*>(&buf_[0]) = id;
    buf_[sizeof(id_type)] = type;
-   return leveldb::Slice(&buf_[0], buf_.size());
+   return leveldb::Slice(&buf_[0], sizeof(buf_));
 }
 
 int queue::key_type::compare(const key_type& other) const

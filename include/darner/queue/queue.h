@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <set>
 
+#include <boost/array.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/optional.hpp>
@@ -147,7 +148,7 @@ public:
 
    private:
 
-      mutable std::vector<char> buf_;
+      mutable boost::array<char, sizeof(id_type) + 1> buf_;
    };
 
    // ties a set of results to a deadline timer
