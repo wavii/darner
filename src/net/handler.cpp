@@ -61,11 +61,9 @@ void handler::parse_request(const system::error_code& e, size_t bytes_transferre
       return done(false);
    }
 
-   // TODO: it would have been nice to pass in an buffers_iterator directly to spirit, but
-   // something constness thing about the iterator_traits::value_type is borking up being able to use it
-   asio::streambuf::const_buffers_type bufs = in_.data();
-   buf_.assign(buffers_begin(bufs), buffers_begin(bufs) + bytes_transferred);
-   if (!parser_.parse(req_, buf_))
+   asio::buffers_iterator<asio::streambuf::const_buffers_type> beg = buffers_begin(in_.data());
+
+   if (!parser_.parse(req_, beg, beg + bytes_transferred))
       return done(false, "ERROR\r\n");
    in_.consume(bytes_transferred);
 

@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <boost/asio.hpp>
 #include <boost/thread/tss.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
@@ -31,12 +32,15 @@ struct request
    size_t wait_ms;
 };
 
-struct request_grammar : boost::spirit::qi::grammar<std::string::const_iterator>
+typedef boost::asio::buffers_iterator<
+      boost::asio::streambuf::const_buffers_type> buffers_iterator_type;
+
+struct request_grammar : boost::spirit::qi::grammar<buffers_iterator_type>
 {
    request_grammar();
    request req;
-   boost::spirit::qi::rule<std::string::const_iterator, std::string()> key_name;
-   boost::spirit::qi::rule<std::string::const_iterator> stats, version, flush, flush_all, set, get_option, get, start;
+   boost::spirit::qi::rule<buffers_iterator_type, std::string()> key_name;
+   boost::spirit::qi::rule<buffers_iterator_type> stats, version, flush, flush_all, set, get_option, get, start;
 };
 
 // grammar are expensive to construct.  to be thread-safe, let's make one grammar per thread.
@@ -44,7 +48,7 @@ class request_parser
 {
 public:
 
-   bool parse(request& req, std::string::const_iterator begin, std::string::const_iterator end)
+   bool parse(request& req, buffers_iterator_type& begin, const buffers_iterator_type& end)
    {
       if (!grammars_.get())
          grammars_.reset(new request_grammar());
@@ -56,12 +60,6 @@ public:
          req = grammar.req;
 
       return success;
-   }
-
-   template <class Sequence>
-   bool parse(request& req, const Sequence& seq)
-   {
-      return parse(req, seq.begin(), seq.end());
    }
 
 private:
