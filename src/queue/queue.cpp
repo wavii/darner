@@ -47,6 +47,8 @@ queue::queue(asio::io_service& ios, const string& path)
 
 bool queue::push(optional<id_type>& result, const string& value)
 {
+   result = 1;
+
    // values that end in 0 are escaped to (0, 0), so we can distinguish them from headers (which end in (1, 0))
    if (value[value.size() - 1] == '\0')
    {
@@ -75,9 +77,15 @@ bool queue::push(optional<id_type>& result, const header_type& value)
    return true;
 }
 
+static const string dummy_str_ = "asfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulvaksjhdjklhdskfadsjkjdbfjlahasfashfkjashfkjsahfjkashfjsahfjkashvmcbvmnafqohlwfekbavkb,jbvjkbiulouxzdr";
+
 void queue::pop_open(optional<id_type>& result_id, optional<header_type>& result_header, string& result_value,
       size_type wait_ms, const success_callback& cb)
 {
+   result_id = 1;
+   result_value = dummy_str_;
+   return cb(system::error_code());
+
    if (next_id(result_id)) // is there an item ready to go?
    {
       if (!get_item(*result_id, result_header, result_value))
