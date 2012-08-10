@@ -146,7 +146,7 @@ private:
          size_t pos = header.rfind(' ');
          if (pos == string::npos)
             return fail("get_on_header", "bad header");
-         size_t required = atoi(header.c_str() + pos + 1);
+         size_t required = atoi(header.c_str() + pos + 1) + 7; // + \r\nEND\r\n
          async_read(
             socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
             bind(&session::get_on_value, shared_from_this(), _1, _2));
@@ -284,9 +284,9 @@ int main(int argc, char * argv[])
    cout << setw(24) << "Sets:" << num_sets << endl;
    cout << setw(24) << "Time taken for tests:" << elapsed_seconds << " seconds" << endl;
    cout << setw(24) << "Bytes read:" << r.bytes_in << " bytes" << endl;
-   cout << setw(24) << "Read rate:" << r.bytes_in / elapsed_seconds / 1024  << " Kbytes/sec" << endl;
+   cout << setw(24) << "Read rate:" << r.bytes_in / elapsed_seconds / 1024  << " [Kbytes/sec]" << endl;
    cout << setw(24) << "Bytes written:" << r.bytes_out << " bytes" << endl;
-   cout << setw(24) << "Write rate:" << r.bytes_out / elapsed_seconds / 1024  << " Kbytes/sec" << endl;
+   cout << setw(24) << "Write rate:" << r.bytes_out / elapsed_seconds / 1024  << " [Kbytes/sec]" << endl;
 
    if (!r.times.empty())
    {
@@ -296,7 +296,7 @@ int main(int argc, char * argv[])
          avg += *it;
       avg /= r.times.size();
 
-      cout << setw(24) << "Requests per second:" << (num_gets + num_sets) / elapsed_seconds << " [us] (mean)" << endl;
+      cout << setw(24) << "Requests per second:" << (num_gets + num_sets) / elapsed_seconds << " [#/sec] (mean)" << endl;
       cout << setw(24) << "Time per request:" << avg << " [us] (mean)" << endl << endl;
       cout << "Percentage of the requests served within a certain time (us)" << endl;
 
