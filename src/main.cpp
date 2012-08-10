@@ -30,13 +30,11 @@ int main(int argc, char * argv[])
    // options allow both on command line and in a config file
    int port;
    string data_path;
-   size_t workers;
 
    po::options_description config("Configuration");
    config.add_options()
       ("debug", "debug (verbose) output")
       ("port,p", po::value<int>(&port)->default_value(22133), "port upon which to listen")
-      ("workers,j", po::value<size_t>(&workers)->default_value(1), "number of worker threads")
       ("data,d", po::value<string>(&data_path)->default_value("data"), "data directory")
   ;
 
@@ -103,7 +101,6 @@ int main(int argc, char * argv[])
 
    log::INFO("darner: queue server");
    log::INFO("build: %1% (%2%) v%3% (c) Wavii, Inc.", __DATE__, __TIME__, DARNER_VERSION);
-   log::INFO("worker threads: %1%", workers);
    log::INFO("listening on port: %1%", port);
    log::INFO("data dir: %1%", data_path);
    if (vm.count("debug"))
@@ -119,7 +116,7 @@ int main(int argc, char * argv[])
 
    log::INFO("starting up");
 
-   server srv(data_path, port, workers);
+   server srv(data_path, port);
 
    // Restore previous signals.
    pthread_sigmask(SIG_SETMASK, &old_mask, 0);
