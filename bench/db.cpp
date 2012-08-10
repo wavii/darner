@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 
+#include <boost/array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -52,8 +53,13 @@ class session : public enable_shared_from_this<session>
 {
 public:
 
+   enum { max_chunk_size = 4096 };
+
    typedef ip::tcp::socket socket_type;
    typedef shared_ptr<session> ptr_type;
+   // maximum frame size: [command]\r\n[chunk_size payload]\r\n
+   // 250 is max key length, so len([command]) = len("VALUE %s 4294967296 4294967296" % ('a' * 250))
+   typedef boost::array<char, 278 + 2 + max_chunk_size + 2> buf_type;
 
    session(io_service& ios, results& _results, const string& host, size_t port)
    : socket_(ios),
@@ -122,7 +128,8 @@ private:
 
       results_.bytes_out += bytes_transferred;
 
-      async_read_until(socket_, in_, '\n', bind(&session::get_on_header, shared_from_this(), _1, _2));
+      in_pos_ = in_.begin();
+      socket_.async_read_some(asio::buffer(in_), bind(&session::get_on_header, shared_from_this(), _1, _2));
    }
 
    void get_on_header(const system::error_code& e, size_t bytes_transferred)
@@ -132,24 +139,36 @@ private:
 
       results_.bytes_in += bytes_transferred;
 
-      asio::streambuf::const_buffers_type bufs = in_.data();
-      string header(buffers_begin(bufs), buffers_begin(bufs) + bytes_transferred);
-      in_.consume(bytes_transferred);
+      buf_type::iterator it = find(in_pos_, in_pos_ + bytes_transferred, '\n');
+      in_pos_ += bytes_transferred;
+      if (it == in_pos_)
+      {
+         if (in_pos_ == in_.end())
+            return fail("get_on_header", "bad header");
+         else
+            return socket_.async_read_some(
+               asio::buffer(in_pos_, in_.end() - in_pos_), bind(&session::get_on_header, shared_from_this(), _1, _2));
+      }
 
-      if (header == "END\r\n")
+      if (++it - in_.begin() == 5) // END\r\n
       {
          results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
          do_get_or_set();
       }
       else
       {
-         size_t pos = header.rfind(' ');
-         if (pos == string::npos)
+         size_t value_received = in_pos_ - it; // we've already received this much of the value
+         while (*it != ' ' && it > in_.begin())
+            --it;
+         if (it == in_.begin())
             return fail("get_on_header", "bad header");
-         size_t required = atoi(header.c_str() + pos + 1) + 7; // + \r\nEND\r\n
-         async_read(
-            socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
-            bind(&session::get_on_value, shared_from_this(), _1, _2));
+         size_t required = atoi(it + 1) + 7 - value_received; // + \r\nEND\r\n
+         if (required)
+            async_read(
+               socket_, asio::buffer(in_), transfer_at_least(required),
+               bind(&session::get_on_value, shared_from_this(), _1, _2));
+         else
+            get_on_value(system::error_code(), 0);
       }
    }
 
@@ -159,9 +178,8 @@ private:
          return fail("get_on_value", e);
 
       results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
-      results_.bytes_in += in_.size();
+      results_.bytes_in += bytes_transferred;
 
-      in_.consume(in_.size());
       do_get_or_set();
    }
 
@@ -182,7 +200,7 @@ private:
 
       size_t required = 8; // STORED\r\n
       async_read(
-         socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
+         socket_, asio::buffer(in_), transfer_at_least(required),
          bind(&session::set_on_response, shared_from_this(), _1, _2));
    }
 
@@ -194,13 +212,14 @@ private:
       results_.times.push_back((posix_time::microsec_clock::local_time() - begin_).total_microseconds());
       results_.bytes_in += bytes_transferred;
 
-      in_.consume(bytes_transferred);
       do_get_or_set();
    }   
 
    socket_type socket_;
-   asio::streambuf in_;
+
    posix_time::ptime begin_;
+   buf_type in_;
+   buf_type::iterator in_pos_; // how much of in_ is occupied
 
    io_service& ios_;
    results& results_;
