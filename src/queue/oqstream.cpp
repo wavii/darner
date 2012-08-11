@@ -17,44 +17,41 @@ oqstream::oqstream(queue& _queue, queue::size_type chunks)
 {
 }
 
-void oqstream::write(const std::string& value, const success_callback& cb)
+void oqstream::write(const std::string& value)
 {
    if (id_) // have an id already?  that's a paddlin'
-      return cb(asio::error::eof);
+      throw system::system_error(asio::error::eof);
    
    if (chunks_ == 1) // just one chunk? push it on
    {
-      if (!queue_.push(id_, value))
-         return cb(system::error_code(system::errc::io_error, system::system_category()));
+      queue_.push(id_, value);
       tell_ += value.size();
-      return cb(system::error_code());
+      return;
    }
 
-   if (!header_)
+   if (!header_)  // reserve a swath of chunks if we haven't already
       queue_.reserve_chunks(header_, chunks_);
 
-   if (!queue_.write_chunk(value, chunk_pos_))
-      return cb(system::error_code(system::errc::io_error, system::system_category()));
+   queue_.write_chunk(value, chunk_pos_);
+
    tell_ += value.size();
    header_->size += value.size();
-   if (++chunk_pos_ == header_->end && !queue_.push(id_, *header_))
-      return cb(system::error_code(system::errc::io_error, system::system_category()));
 
-   cb(system::error_code());
+   if (++chunk_pos_ == header_->end) // time to push the item?
+      queue_.push(id_, *header_);
 }
 
-void oqstream::cancel(const success_callback& cb)
+void oqstream::cancel()
 {
    if (id_) // can't cancel if we already pushed all the chunks
-      return cb(asio::error::invalid_argument);
+      throw system::system_error(asio::error::invalid_argument);
 
    if (!header_) // nothing wrong with canceling nothing
-      return cb(system::error_code());
+      return;
 
-   if (!queue_.erase_chunks(*header_))
-      return cb(system::error_code(system::errc::io_error, system::system_category()));
+   queue_.erase_chunks(*header_);
 
-   header_ = optional<queue::header_type>();
+   header_.reset();
    chunk_pos_ = tell_ = 0;
 }
 

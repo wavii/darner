@@ -2,7 +2,6 @@
 #define __DARNER_QUEUE_IQSTREAM_H__
 
 #include <boost/optional.hpp>
-#include <boost/function.hpp>
 
 #include "darner/queue/queue.h"
 
@@ -12,21 +11,21 @@ class iqstream
 {
 public:
 
-   typedef boost::function<void (const boost::system::error_code& error)> success_callback;
-
-   iqstream(queue& _queue, queue::size_type wait_ms);
+   /*
+    * tries to open an item immediately.  reads will fail if it couldn't open an item.
+    */
+   iqstream(queue& _queue);
 
    /*
-    * on the first read, waits for an item to enter the queue, and calls cb after at most wait_ms milliseconds
-    * with a success code.  after a successful first read, you can continue reading until eof
-    * (or until tell() == size()).  lifetime of string result until cb is called is the responsibility of the caller.
+    * on the first read, tries to fetch an item and returns true if one was available
+    * can continue calling read until eof (until tell() == size()).
     */
-   void read(std::string& result, const success_callback& cb);
+   bool read(std::string& result);
 
    /*
     * closes the iqstream.  if remove, completes the pop of the item off the queue, otherwise returns it
     */
-   void close(bool remove, const success_callback& cb);
+   void close(bool remove);
 
    /*
     * returns the position in the stream in bytes.  only valid after first read()
@@ -40,10 +39,7 @@ public:
    
 private:
 
-   void on_open(std::string& result, const success_callback& cb, const boost::system::error_code& e);
-
    queue& queue_;
-   queue::size_type wait_ms_;
 
    boost::optional<queue::id_type> id_; // id of key in queue, only set after a succesful first read
    boost::optional<queue::header_type> header_; // only set if it's multi-chunk

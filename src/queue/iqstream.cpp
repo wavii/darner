@@ -9,51 +9,44 @@ using namespace std;
 using namespace boost;
 using namespace darner;
 
-iqstream::iqstream(queue& _queue, queue::size_type wait_ms)
+iqstream::iqstream(queue& _queue)
 : queue_(_queue),
-  wait_ms_(wait_ms),
   chunk_pos_(0),
   tell_(0)
 {
 }
 
-void iqstream::read(string& result, const success_callback& cb)
+bool iqstream::read(string& result)
 {
-   if (id_) // have an id already?  probably just reading the next chunk
+   if (!id_) // should we try to fetch a queue item?
    {
-      if (!header_ || chunk_pos_ >= header_->end)
-         return cb(asio::error::eof);
-      if (!queue_.read_chunk(result, chunk_pos_))
-         return cb(system::error_code(system::errc::io_error, system::system_category()));
-      ++chunk_pos_;
-      tell_ += result.size();
+      if (!queue_.pop_open(id_, header_, result))
+         return false;
+
+      if (!header_) // not multi-chunk?  we're done!
+      {
+         tell_ += result.size();
+         return true;
+      }
+
+      chunk_pos_ = header_->beg;
    }
-   else
-      queue_.pop_open(id_, header_, result, wait_ms_, bind(&iqstream::on_open, this, ref(result), cb, _1));
+
+   // if we have an id already, and are still requesting more reads, we must be multi-chunk
+   // make sure that's the cast, and that we haven't read past the end
+   if (!header_ || chunk_pos_ >= header_->end)
+      throw system::system_error(asio::error::eof);
+
+   queue_.read_chunk(result, chunk_pos_);
+
+   ++chunk_pos_;
+   tell_ += result.size();
 }
 
-void iqstream::close(bool remove, const success_callback& cb)
+void iqstream::close(bool remove)
 {
    if (!id_)
-      return cb(asio::error::not_found);
+      throw system::system_error(asio::error::not_found); // can't close something we haven't opened
 
-   if (!queue_.pop_close(remove, *id_, header_))
-      return cb(system::error_code(system::errc::io_error, system::system_category()));
-
-   cb(system::error_code());
-}
-
-void iqstream::on_open(string& result, const success_callback& cb, const system::error_code& e)
-{
-   if (e)
-      return cb(e);
-   if (header_)
-   {
-      chunk_pos_ = header_->beg;
-      if (!queue_.read_chunk(result, chunk_pos_))
-         return cb(system::error_code(system::errc::io_error, system::system_category()));
-      ++chunk_pos_;
-   }
-   tell_ += result.size();
-   cb(system::error_code());
+   queue_.pop_close(remove, *id_, header_);
 }

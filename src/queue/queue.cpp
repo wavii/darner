@@ -43,67 +43,93 @@ queue::queue(asio::io_service& ios, const string& path)
    }
 }
 
+queue::size_type queue::count()
+{
+   return (queue_head_.id - queue_tail_.id) + returned_.size();
+}
+
+void queue::wait(size_type wait_ms, const success_callback& cb)
+{
+   ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, wait_ms, cb));
+   it->timer.async_wait(bind(&queue::waiter_timeout, this, asio::placeholders::error, it));      
+}
+
 // protected:
 
-bool queue::push(optional<id_type>& result, const string& value)
+void queue::push(optional<id_type>& result, const string& value)
 {
    // values that end in 0 are escaped to (0, 0), so we can distinguish them from headers (which end in (1, 0))
    if (value[value.size() - 1] == '\0')
    {
       string new_value = value + '\0';
       if (!journal_->Put(leveldb::WriteOptions(), queue_head_.slice(), new_value).ok())
-         return false;
+         throw system::system_error(system::errc::io_error, system::system_category());
    }
    else if (!journal_->Put(leveldb::WriteOptions(), queue_head_.slice(), value).ok())
-      return false;
+      throw system::system_error(system::errc::io_error, system::system_category());
+
    result = queue_head_.id++;
 
    spin_waiters(); // in case there's a waiter waiting for this new item
-
-   return true;
 }
 
-bool queue::push(optional<id_type>& result, const header_type& value)
+void queue::push(optional<id_type>& result, const header_type& value)
 {
    if (!journal_->Put(leveldb::WriteOptions(), queue_head_.slice(), value.str()).ok())
-      return false;
+      throw system::system_error(system::errc::io_error, system::system_category());
 
    result = queue_head_.id++;
 
    spin_waiters(); // in case there's a waiter waiting for this new item
+}
+
+bool queue::pop_open(optional<id_type>& result_id, optional<header_type>& result_header, string& result_value)
+{
+   if (!returned_.empty())
+   {
+      result_id = *returned_.begin();
+      returned_.erase(returned_.begin());
+   }
+   else if (queue_tail_.id != queue_head_.id)
+      result_id = queue_tail_.id++;
+   else
+      return false;
+
+   if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_QUEUE, *result_id).slice(), &result_value).ok())
+      throw system::system_error(system::errc::io_error, system::system_category());
+
+   // check the escapes
+   if (result_value.size() > 2 && result_value[result_value.size() - 1] == '\0')
+   {
+      if (result_value[result_value.size() - 2] == '\1') // \1 \0 means header
+      {
+         result_header = header_type(result_value);
+         if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_CHUNK, result_header->beg).slice(),
+            &result_value).ok())
+            throw system::system_error(system::errc::io_error, system::system_category());
+      }
+      else if (result_value[result_value.size() - 2] == '\0') // \0 \0 means escaped \0
+         result_value.resize(result_value.size() - 1);
+      else
+         throw system::system_error(system::errc::io_error, system::system_category()); // anything else is bad data
+   }
 
    return true;
 }
 
-void queue::pop_open(optional<id_type>& result_id, optional<header_type>& result_header, string& result_value,
-      size_type wait_ms, const success_callback& cb)
-{
-   if (next_id(result_id)) // is there an item ready to go?
-   {
-      if (!get_item(*result_id, result_header, result_value))
-         return cb(system::error_code(system::errc::io_error, system::system_category()));
-      return cb(system::error_code());
-   }
-   else if (wait_ms) // can we at least wait a bit?
-   {
-      ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, result_id, result_header,
-         result_value, wait_ms, cb));
-      it->timer.async_wait(bind(&queue::waiter_timeout, this, asio::placeholders::error, it));      
-   }
-   else
-      return cb(asio::error::not_found); // can't wait?  no item for you
-}
-
-bool queue::pop_close(bool remove, id_type id, const optional<header_type>& header)
+void queue::pop_close(bool remove, id_type id, const optional<header_type>& header)
 {
    if (remove)
    {
       leveldb::WriteBatch batch;
       batch.Delete(key_type(key_type::KT_QUEUE, id).slice());
+
       if (header)
          for (key_type k(key_type::KT_CHUNK, header->beg); k.id != header->end; ++k.id)
             batch.Delete(k.slice());
-      return journal_->Write(leveldb::WriteOptions(), &batch).ok();
+
+      if (!journal_->Write(leveldb::WriteOptions(), &batch).ok())
+         throw system::system_error(system::errc::io_error, system::system_category());
    }
    else
    {
@@ -111,14 +137,7 @@ bool queue::pop_close(bool remove, id_type id, const optional<header_type>& head
 
       // in case there's a waiter waiting for this returned key
       spin_waiters();
-
-      return true;
    }
-}
-
-queue::size_type queue::count()
-{
-   return (queue_head_.id - queue_tail_.id) + returned_.size();
 }
 
 void queue::reserve_chunks(optional<header_type>& result, size_type chunks)
@@ -127,24 +146,27 @@ void queue::reserve_chunks(optional<header_type>& result, size_type chunks)
    chunks_head_.id += chunks;
 }
 
-bool queue::write_chunk(const string& value, id_type chunk_key)
+void queue::write_chunk(const string& value, id_type chunk_key)
 {
-   key_type key(key_type::KT_CHUNK, chunk_key);
-   return journal_->Put(leveldb::WriteOptions(), key.slice(), value).ok();
+   if (!journal_->Put(leveldb::WriteOptions(), key_type(key_type::KT_CHUNK, chunk_key).slice(), value).ok())
+      throw system::system_error(system::errc::io_error, system::system_category());
 }
 
-bool queue::read_chunk(string& result, id_type chunk_key)
+void queue::read_chunk(string& result, id_type chunk_key)
 {
-   key_type key(key_type::KT_CHUNK, chunk_key);
-   return journal_->Get(leveldb::ReadOptions(), key.slice(), &result).ok();
+   if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_CHUNK, chunk_key).slice(), &result).ok())
+      throw system::system_error(system::errc::io_error, system::system_category());
 }
 
-bool queue::erase_chunks(const header_type& header)
+void queue::erase_chunks(const header_type& header)
 {
    leveldb::WriteBatch batch;
+
    for (key_type k(key_type::KT_CHUNK, header.beg); k.id != header.end; ++k.id)
       batch.Delete(k.slice());
-   return journal_->Write(leveldb::WriteOptions(), &batch).ok();
+
+   if (!journal_->Write(leveldb::WriteOptions(), &batch).ok())
+      throw system::system_error(system::errc::io_error, system::system_category());
 }
 
 // private:
@@ -153,51 +175,12 @@ void queue::spin_waiters()
 {
    while (true)
    {
-      if (waiters_.empty())
-         break;
-      optional<id_type> result_id;
-      if (!next_id(result_id))
+      if (waiters_.empty() || (returned_.empty() && queue_tail_.id == queue_head_.id))
          break;
       ptr_list<waiter>::auto_type waiter = waiters_.release(waiters_.begin());
       waiter->timer.cancel();
-      waiter->result_id = *result_id;
-      if (!get_item(*waiter->result_id, waiter->result_header, waiter->result_value))
-         return waiter->cb(system::error_code(system::errc::io_error, system::system_category()));
       waiter->cb(system::error_code());
    }
-}
-
-bool queue::next_id(optional<id_type> & id)
-{
-   if (!returned_.empty())
-   {
-      id = *returned_.begin();
-      returned_.erase(returned_.begin());
-   }
-   else if (queue_tail_.id != queue_head_.id)
-      id = queue_tail_.id++;
-   else
-      return false;
-   return true;
-}
-
-bool queue::get_item(id_type result_id, optional<header_type>& result_header, string& result_value)
-{
-   if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_QUEUE, result_id).slice(), &result_value).ok())
-      return false;
-
-   // check the escapes
-   if (result_value.size() > 2 && result_value[result_value.size() - 2] == '\1' &&
-      result_value[result_value.size() - 1] == '\0')
-   {
-      result_header = header_type(result_value);
-      return journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_CHUNK, result_header->beg).slice(),
-         &result_value).ok();
-   }
-   else if (result_value.size() > 2 && result_value[result_value.size() - 1] == '\0' && result_value[result_value.size() - 2] == '\0')
-      result_value.resize(result_value.size() - 1);
-
-   return true;
 }
 
 void queue::waiter_timeout(const system::error_code& e, ptr_list<queue::waiter>::iterator waiter_it)

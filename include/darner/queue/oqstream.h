@@ -12,20 +12,17 @@ class oqstream
 {
 public:
 
-   typedef boost::function<void (const boost::system::error_code& error)> success_callback;
-
    oqstream(queue& _queue, queue::size_type chunks);
 
    /*
-    * writes a chunk of the item, and calls cb after at most wait_ms milliseconds with a success code.
-    * lifetime of string value until cb is called is the responsibility of the caller.
+    * writes a chunk of the item. fails if more chunks are written than originally reserved.
     */
-   void write(const std::string& value, const success_callback& cb);
+   void write(const std::string& value);
 
    /*
-    * cancels the oqstream write.  only available to mutli-chunks that haven't written all their chunks yet
+    * cancels the oqstream write.  only available to mutli-chunks that haven't written all their chunks yet.
     */
-   void cancel(const success_callback& cb);
+   void cancel();
 
    /*
     * returns the position in the stream in bytes.
