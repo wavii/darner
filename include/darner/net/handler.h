@@ -62,13 +62,11 @@ private:
 
    void set_on_read_chunk(const boost::system::error_code& e, size_t bytes_transferred);
 
-   void set_on_write_chunk(const boost::system::error_code& e);
-
    // get loop:
 
-   void get_on_pop_close_pre(const boost::system::error_code& e);
+   void get_on_queue_return(const boost::system::error_code& e);
 
-   void get_on_read_first_chunk(const boost::system::error_code& e);
+   void write_first_chunk();
 
    void get_on_read_next_chunk(const boost::system::error_code& e);
 
@@ -82,8 +80,6 @@ private:
    void done(bool success, const std::string& msg = "");
 
    void finalize(const boost::system::error_code& e, size_t bytes_transferred);
-
-   void do_nothing(const boost::system::error_code& e);
 
    const queue::size_type chunk_size_;
 
