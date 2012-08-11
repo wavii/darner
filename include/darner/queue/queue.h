@@ -1,14 +1,14 @@
 #ifndef __DARNER_QUEUE_H__
 #define __DARNER_QUEUE_H__
 
-#include <stdexcept>
 #include <set>
+#include <string>
+#include <sstream>
 
 #include <boost/array.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/optional.hpp>
-#include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -41,13 +41,14 @@ public:
    // open or create the queue at the path
    queue(boost::asio::io_service& ios, const std::string& path);
 
-   // returns the number of items in the queue
-   size_type count();
-
    // wait up to wait_ms milliseconds for an item to become available, then call cb with success or timeout
    void wait(size_type wait_ms, const success_callback& cb);
 
-   // TODO: consider also reporting a queue size
+   // returns the number of items in the queue
+   size_type count() const;
+
+   // writes out stats (stuff like queue count) to a stream
+   void write_stats(const std::string& name, std::ostringstream& out) const;
 
 protected:
 
@@ -200,6 +201,8 @@ private:
    key_type queue_head_;
    key_type queue_tail_;
    key_type chunks_head_;
+
+   size_type items_open_; // an open item is < TAIL but not in returned_
 
    std::set<id_type> returned_; // items < TAIL that were reserved but later returned (not popped)
 

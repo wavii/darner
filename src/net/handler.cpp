@@ -24,16 +24,12 @@ handler::handler(io_service& ios,
 
 handler::~handler()
 {
-   mutex::scoped_lock lock(stats_.mutex);
    ++stats_.conns_closed;
 }
 
 void handler::start()
 {
-   {
-      mutex::scoped_lock lock(stats_.mutex);
-      ++stats_.conns_opened;
-   }
+   ++stats_.conns_opened;
    socket_.set_option(ip::tcp::no_delay(true));
 
    read_request(system::error_code(), 0);
@@ -82,10 +78,15 @@ void handler::parse_request(const system::error_code& e, size_t bytes_transferre
 
 void handler::write_stats()
 {
-   {
-      mutex::scoped_lock lock(stats_.mutex);
-      stats_.write(buf_);
-   }
+   ostringstream oss;
+   stats_.write(oss);
+
+   for (queue_map::const_iterator it = queues_.begin(); it != queues_.end(); ++it)
+      it->second->write_stats(it->first, oss);
+
+   oss << "END\r\n";
+   buf_ = oss.str();
+
    async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
 }
 
@@ -106,6 +107,8 @@ void handler::flush_all()
 
 void handler::set()
 {
+   ++stats_.cmd_sets;
+
    // round up the number of chunks we need, and fetch \r\n if it's just one chunk
    push_stream_ = in_place(ref(queues_[req_.queue]), (req_.num_bytes + chunk_size_ - 1) / chunk_size_);
    queue::size_type remaining = req_.num_bytes - push_stream_->tell();
@@ -164,6 +167,8 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
 
 void handler::get()
 {
+   ++stats_.cmd_gets;
+
    if (req_.get_abort && (req_.get_open || req_.get_close))
       return done(false, "CLIENT_ERROR abort must be by itself\r\n");
 

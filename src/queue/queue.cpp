@@ -1,5 +1,7 @@
 #include "darner/queue/queue.h"
 
+#include <boost/bind.hpp>
+
 #include <leveldb/iterator.h>
 #include <leveldb/write_batch.h>
 
@@ -12,6 +14,7 @@ queue::queue(asio::io_service& ios, const string& path)
   queue_head_(key_type::KT_QUEUE, 0),
   queue_tail_(key_type::KT_QUEUE, 0),
   chunks_head_(key_type::KT_CHUNK, 0),
+  items_open_(0),
   ios_(ios)
 {
    leveldb::Options options;
@@ -43,15 +46,22 @@ queue::queue(asio::io_service& ios, const string& path)
    }
 }
 
-queue::size_type queue::count()
+void queue::wait(size_type wait_ms, const success_callback& cb)
+{
+   ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, wait_ms, cb));
+   it->timer.async_wait(bind(&queue::waiter_timeout, this, asio::placeholders::error, it));
+}
+
+queue::size_type queue::count() const
 {
    return (queue_head_.id - queue_tail_.id) + returned_.size();
 }
 
-void queue::wait(size_type wait_ms, const success_callback& cb)
+void queue::write_stats(const string& name, ostringstream& out) const
 {
-   ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, wait_ms, cb));
-   it->timer.async_wait(bind(&queue::waiter_timeout, this, asio::placeholders::error, it));      
+   out << "STAT queue_" << name << "_items " << count() << "\r\n";
+   out << "STAT queue_" << name << "_waiters " << waiters_.size() << "\r\n";
+   out << "STAT queue_" << name << "_open_transactions " << items_open_ << "\r\n";
 }
 
 // protected:
@@ -114,6 +124,8 @@ bool queue::pop_open(optional<id_type>& result_id, optional<header_type>& result
          throw system::system_error(system::errc::io_error, system::system_category()); // anything else is bad data
    }
 
+   ++items_open_;
+
    return true;
 }
 
@@ -138,6 +150,8 @@ void queue::pop_close(bool remove, id_type id, const optional<header_type>& head
       // in case there's a waiter waiting for this returned key
       spin_waiters();
    }
+
+   --items_open_;
 }
 
 void queue::reserve_chunks(optional<header_type>& result, size_type chunks)

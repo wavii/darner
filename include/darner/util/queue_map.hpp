@@ -5,7 +5,6 @@
 
 #include <boost/asio.hpp>
 #include <boost/ptr_container/ptr_map.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/filesystem/operations.hpp>
 
 #include "darner/queue/queue.h"
@@ -33,7 +32,6 @@ public:
 
    queue& operator[] (const std::string& queue_name)
    {
-      boost::mutex::scoped_lock lock(mutex);
       boost::ptr_map<std::string, queue>::iterator it = queues_.find(queue_name);
       if (it == queues_.end())
       {
@@ -43,10 +41,10 @@ public:
       return *it->second;
    }
 
-   boost::asio::io_service& get_io_service()
-   {
-      return ios_;
-   }
+   iterator begin()             { return queues_.begin(); }
+   iterator end()               { return queues_.end(); }
+   const_iterator begin() const { return queues_.begin(); }
+   const_iterator end() const   { return queues_.end(); }
 
 private:
 
@@ -54,8 +52,6 @@ private:
 
    boost::filesystem::path data_path_;
    boost::asio::io_service& ios_;
-
-   boost::mutex mutex;
 };
 
 } // darner
