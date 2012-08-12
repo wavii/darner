@@ -47,6 +47,63 @@ memcache 800 conns: 36264.7 #/sec (mean)
 memcache 1000 conns: 9547.91 #/sec (mean)
 ```
 
+# Fairness
+
+How does the queue server deal with messages of varying sizes?  This benchmark pushes large messages through the queue
+in order to see whether they cause latency spikes for smaller requests, which can lead to timeouts.  For the graph
+below, a flatter curve means each request is more fairly served in time.
+
+![Fairness Benchmark](/wavii/darner/raw/master/docs/images/bench_fairness.png)
+
+```
+ubuntu@domU-12-31-39-0E-0C-72:~/darner$ bench/fairness.sh 
+warming up kestrel...done.
+kestrel stats:
+Concurrency Level:      10
+Gets:                   0
+Sets:                   100000
+Time taken for tests:   215.285 seconds
+Bytes read:             800000 bytes
+Read rate:              3.62891 Kbytes/sec
+Bytes written:          8700000 bytes
+Write rate:             39.4644 Kbytes/sec
+Requests per second:    464.501 #/sec (mean)
+Time per request:       21503.9 us (mean)
+
+Percentage of the requests served within a certain time (us)
+  50%:    969
+  66%:    1596
+  75%:    2777
+  80%:    5644
+  90%:    34467
+  95%:    90138
+  98%:    299754
+  99%:    473703
+ 100%:    1841528 (longest request)
+darner stats:
+Concurrency Level:      10
+Gets:                   0
+Sets:                   100000
+Time taken for tests:   20.622 seconds
+Bytes read:             800000 bytes
+Read rate:              37.8843 Kbytes/sec
+Bytes written:          8700000 bytes
+Write rate:             411.992 Kbytes/sec
+Requests per second:    4849.19 #/sec (mean)
+Time per request:       2060.75 us (mean)
+
+Percentage of the requests served within a certain time (us)
+  50%:    869
+  66%:    911
+  75%:    944
+  80%:    968
+  90%:    1117
+  95%:    2523
+  98%:    43498
+  99%:    43951
+ 100%:    91903 (longest request)
+ ```
+
 # Queue Packing
 
 This tests the queue server's behavior with a backlog of items.  The challenge for the queue server is to serve items
