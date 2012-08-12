@@ -24,7 +24,7 @@ public:
    typedef boost::shared_ptr<handler> ptr_type;
 
    handler(boost::asio::io_service& ios, request_parser& parser, queue_map& queues, stats& _stats,
-      queue::size_type chunk_size = 4096);
+      queue::size_type chunk_size = 1024);
 
    ~handler();
 

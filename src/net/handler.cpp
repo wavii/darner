@@ -12,7 +12,7 @@ handler::handler(io_service& ios,
                  request_parser& parser,
                  queue_map& queues,
                  stats& _stats,
-                 queue::size_type chunk_size /* = 4096 */)
+                 queue::size_type chunk_size /* = 1024 */)
    : chunk_size_(chunk_size),
      socket_(ios),
      parser_(parser),
