@@ -50,7 +50,7 @@ public:
          grammars_.reset(new request_grammar());
       request_grammar& grammar = *grammars_;
 
-      new(&grammar.req) request(); // spooky placement new!
+      grammar.req = request();
       bool success = boost::spirit::qi::parse(begin, end, grammar) && (begin == end);
       if (success)
          req = grammar.req;
