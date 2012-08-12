@@ -1,6 +1,41 @@
-These benchmarks were run on an [Amazon EC2 m1.large](http://aws.amazon.com/ec2/instance-types/): 7.5GB memory, 2 cores,
-64-bit ubuntu. The kestrel server was run with OpenJDK 1.6, with the default JVM options provided from its example init
-scripts.
+Benchmark Details:
+
+* [Amazon EC2 m1.large](http://aws.amazon.com/ec2/instance-types/): 7.5GB memory, 2 virtual cores
+* 64-bit Ubuntu 11.10
+* Darner 0.0.1, compiled Boost 1.46 and leveldb 1.5.0
+* Kestrel 2.2.0 with OpenJDK 1.6
+
+# Resident Memory
+
+How much memory does the queue server use?  We are testing both steady-state requirements, and also how aggressively
+the server acquires and releases memory as queues expand and contract.  We tuned Kestrel's JVM down to the smallest
+heap that didn't cause OOM's and didn't impact performance: `-Xmx256m -Xms256m`.
+
+![Resident Memory Benchmark](/wavii/darner/raw/master/docs/images/bench_memory_resident.png)
+
+```
+ubuntu@domU-12-31-39-0E-0C-72:~/darner$ bench/mem_rss.sh 
+kestrel       0 requests: 72120 kB
+kestrel    1024 requests: 82348 kB
+kestrel    2048 requests: 113232 kB
+kestrel    4096 requests: 143220 kB
+kestrel    8192 requests: 152852 kB
+kestrel   16384 requests: 171208 kB
+kestrel   32768 requests: 207528 kB
+kestrel   65536 requests: 266344 kB
+kestrel  131072 requests: 366024 kB
+kestrel  262024 requests: 369688 kB
+darner        0 requests: 2216 kB
+darner     1024 requests: 3984 kB
+darner     2048 requests: 6236 kB
+darner     4096 requests: 10732 kB
+darner     8192 requests: 15956 kB
+darner    16384 requests: 20028 kB
+darner    32768 requests: 13324 kB
+darner    65536 requests: 12872 kB
+darner   131072 requests: 17960 kB
+darner   262024 requests: 16232 kB
+```
 
 # Queue Flooding
 
