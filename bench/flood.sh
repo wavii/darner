@@ -18,7 +18,8 @@ echo -ne "flush db_bench\r\n" | nc localhost 22134 >/dev/null
 
 for i in 1 2 5 10 50 100 200 300
 do
-   echo -n "kestrel $i conns: "
+   sync # just in case dirty pages are lying around, don't leak across each run
+   printf "kestrel  %4i conns: " "$i"
    ./db -p 22133 -s 100000 -g 100000 -c $i | grep -i "requests per second" | awk -F"    " '{print $2}'
 done
 
@@ -27,13 +28,14 @@ echo -ne "flush db_bench\r\n" | nc localhost 22134 >/dev/null
 
 for i in 1 2 5 10 50 100 200 300 400 600 800 1000
 do
-   echo -ne "flush db_bench\r\n" | nc localhost 22134 >/dev/null
-   echo -n "darner $i conns: "
+   sync
+   printf "darner   %4i conns: " "$i"
    ./db -p 22134 -s 100000 -g 100000 -c $i | grep -i "requests per second" | awk -F"    " '{print $2}'
 done
 
 for i in 1 2 5 10 50 100 200 300 400 600 800 1000
 do
-   echo -n "memcache $i conns: "
+   sync
+   printf "memcache %4i conns: " "$i"
    ./db -p 11211 -s 100000 -g 100000 -c $i | grep -i "requests per second" | awk -F"    " '{print $2}'
 done

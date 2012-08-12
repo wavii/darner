@@ -284,9 +284,9 @@ int main(int argc, char * argv[])
    cout << setw(24) << "Sets:" << num_sets << endl;
    cout << setw(24) << "Time taken for tests:" << elapsed_seconds << " seconds" << endl;
    cout << setw(24) << "Bytes read:" << r.bytes_in << " bytes" << endl;
-   cout << setw(24) << "Read rate:" << r.bytes_in / elapsed_seconds / 1024  << " [Kbytes/sec]" << endl;
+   cout << setw(24) << "Read rate:" << r.bytes_in / elapsed_seconds / 1024  << " Kbytes/sec" << endl;
    cout << setw(24) << "Bytes written:" << r.bytes_out << " bytes" << endl;
-   cout << setw(24) << "Write rate:" << r.bytes_out / elapsed_seconds / 1024  << " [Kbytes/sec]" << endl;
+   cout << setw(24) << "Write rate:" << r.bytes_out / elapsed_seconds / 1024  << " Kbytes/sec" << endl;
 
    if (!r.times.empty())
    {
@@ -296,8 +296,8 @@ int main(int argc, char * argv[])
          avg += *it;
       avg /= r.times.size();
 
-      cout << setw(24) << "Requests per second:" << (num_gets + num_sets) / elapsed_seconds << " [#/sec] (mean)" << endl;
-      cout << setw(24) << "Time per request:" << avg << " [us] (mean)" << endl << endl;
+      cout << setw(24) << "Requests per second:" << (num_gets + num_sets) / elapsed_seconds << " #/sec (mean)" << endl;
+      cout << setw(24) << "Time per request:" << avg << " us (mean)" << endl << endl;
       cout << "Percentage of the requests served within a certain time (us)" << endl;
 
       int percentages[] = {50, 66, 75, 80, 90, 95, 98, 99};
