@@ -223,7 +223,7 @@ int main(int argc, char * argv[])
       ("port,p", po::value<size_t>(&port), "port to establish connections")
       ("gets,g", po::value<size_t>(&num_gets)->default_value(10000), "number of gets to issue")
       ("sets,s", po::value<size_t>(&num_sets)->default_value(10000), "number of sets to issue")
-      ("item_size", po::value<size_t>(&item_size)->default_value(1024), "default size of item")
+      ("item_size,i", po::value<size_t>(&item_size)->default_value(64), "default size of item")
       ("concurrency,c", po::value<size_t>(&workers)->default_value(10), "number of concurrent workers");
 
    po::options_description cmdline_options;
