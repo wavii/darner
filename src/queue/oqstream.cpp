@@ -21,7 +21,7 @@ void oqstream::write(const std::string& value)
 {
    if (id_) // have an id already?  that's a paddlin'
       throw system::system_error(asio::error::eof);
-   
+
    if (chunks_ == 1) // just one chunk? push it on
    {
       queue_.push(id_, value);
@@ -30,7 +30,10 @@ void oqstream::write(const std::string& value)
    }
 
    if (!header_)  // reserve a swath of chunks if we haven't already
+   {
       queue_.reserve_chunks(header_, chunks_);
+      chunk_pos_ = header_->beg;
+   }
 
    queue_.write_chunk(value, chunk_pos_);
 

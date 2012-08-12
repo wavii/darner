@@ -41,6 +41,8 @@ bool iqstream::read(string& result)
 
    ++chunk_pos_;
    tell_ += result.size();
+
+   return true;
 }
 
 void iqstream::close(bool remove)
