@@ -2,7 +2,7 @@ These benchmarks were run on an [Amazon EC2 m1.large](http://aws.amazon.com/ec2/
 64-bit ubuntu. The kestrel server was run with OpenJDK 1.6, with the default JVM options provided from its example init
 scripts.
 
-# Queue Flood Benchmark
+# Queue Flooding
 
 How quickly can we flood items through an empty queue?  This tests the raw throughput of the server.  We also include
 memcache as an upper bound - a throughput at which we are likely saturating on `send/recv` syscalls.  We had to stop the
@@ -11,7 +11,7 @@ kestrel benchmark at 300 concurrent connections - anything higher caused connect
 ![Queue Flood Benchmark](/wavii/darner/raw/master/docs/images/bench_queue_flood.png)
 
 ```
-ubuntu@domU-12-31-39-0E-0C-72:~/darner$ bench/flood.sh 
+ubuntu@domU-12-31-39-0E-0C-72:~/darner$ bench/flood.sh
 warming up kestrel...done.
 kestrel 1 conns: 6987.88 #/sec (mean)
 kestrel 2 conns: 8910.67 #/sec (mean)
@@ -45,4 +45,31 @@ memcache 400 conns: 41169.2 #/sec (mean)
 memcache 600 conns: 39880.4 #/sec (mean)
 memcache 800 conns: 36264.7 #/sec (mean)
 memcache 1000 conns: 9547.91 #/sec (mean)
+```
+
+# Queue Packing
+
+This tests the queue server's behavior with a backlog of items.  The challenge for the queue server is to serve items
+that no longer all fit in memory.  Absolute throughput isn't important here - item sizes are large to quickly saturate
+free memory.  Instead it's important for the throughput to flatten out as the backlog grows.
+
+![Queue Packing Benchmark](/wavii/darner/raw/master/docs/images/bench_queue_packing.png)
+
+```
+ubuntu@domU-12-31-39-0E-0C-72:~/darner$ bench/packing.sh
+warming up kestrel...done.
+kestrel 0 sets: 9700.73 #/sec (mean)
+kestrel 4096 sets: 10039.7 #/sec (mean)
+kestrel 16384 sets: 9595.09 #/sec (mean)
+kestrel 65536 sets: 9581.76 #/sec (mean)
+kestrel 262144 sets: 8785.42 #/sec (mean)
+kestrel 1048576 sets: 8916.23 #/sec (mean)
+kestrel 4194304 sets: 8460.59 #/sec (mean)
+darner 0 sets: 17124.8 #/sec (mean)
+darner 4096 sets: 14646.6 #/sec (mean)
+darner 16384 sets: 12122.7 #/sec (mean)
+darner 65536 sets: 10717 #/sec (mean)
+darner 262144 sets: 10970.3 #/sec (mean)
+darner 1048576 sets: 11596.9 #/sec (mean)
+darner 4194304 sets: 11017.5 #/sec (mean)
 ```
