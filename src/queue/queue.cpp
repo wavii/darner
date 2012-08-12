@@ -142,6 +142,11 @@ void queue::pop_close(bool remove, id_type id, const optional<header_type>& head
 
       if (!journal_->Write(leveldb::WriteOptions(), &batch).ok())
          throw system::system_error(system::errc::io_error, system::system_category());
+
+      // leveldb is conservative about reclaiming deleted keys, of which there will be many when a queue grows and
+      // later shrinks.  let's explicitly force it to compact every 1024 deletes
+      if (id % 1024 == 0)
+         journal_->CompactRange(NULL, NULL);
    }
    else
    {
