@@ -1,3 +1,5 @@
+// darner bench: similar to apache bench: reports statistics for gets/sets over concurrent connections
+
 #include <iostream>
 
 #include <string>
@@ -55,12 +57,15 @@ public:
    typedef ip::tcp::socket socket_type;
    typedef shared_ptr<session> ptr_type;
 
-   session(io_service& ios, results& _results, const string& host, size_t port)
+   session(io_service& ios, results& _results, const string& host, size_t port, size_t bad_client_rate,
+      size_t action = 0)
    : socket_(ios),
      ios_(ios),
      results_(_results),
      host_(host),
-     port_(port)
+     port_(port),
+     bad_client_rate_(bad_client_rate),
+     action_(action)
    {
    }
 
@@ -112,7 +117,12 @@ private:
       --results_.gets_remaining;
       begin_ = posix_time::microsec_clock::local_time();
 
-      async_write(socket_, buffer(results_.get_request), bind(&session::get_on_write, shared_from_this(), _1, _2));
+      // gets can be bad in two ways: bad send, bad recv
+      bool bad_client = bad_client_rate_ && !(action_++ % bad_client_rate_);
+      size_t buf_len = bad_client ? results_.get_request.size() / 2 : results_.get_request.size();
+      
+      async_write(
+         socket_, buffer(results_.get_request, buf_len), bind(&session::get_on_write, shared_from_this(), _1, _2));
    }
 
    void get_on_write(const system::error_code& e, size_t bytes_transferred)
@@ -122,13 +132,23 @@ private:
 
       results_.bytes_out += bytes_transferred;
 
-      async_read_until(socket_, in_, '\n', bind(&session::get_on_header, shared_from_this(), _1, _2));
+      if (bytes_transferred < results_.get_request.size()) // bad client?  hang up and reconnect
+         session::ptr_type(new session(ios_, results_, host_, port_, bad_client_rate_, action_))->start();
+      else
+         async_read_until(socket_, in_, '\n', bind(&session::get_on_header, shared_from_this(), _1, _2));
    }
 
    void get_on_header(const system::error_code& e, size_t bytes_transferred)
    {
       if (e)
          return fail("get_on_header", e);
+
+      bool bad_client = bad_client_rate_ && !(action_++ % bad_client_rate_);
+      if (bad_client)
+      {
+         session::ptr_type(new session(ios_, results_, host_, port_, bad_client_rate_, action_))->start();
+         return;
+      }
 
       results_.bytes_in += bytes_transferred;
 
@@ -170,7 +190,11 @@ private:
       --results_.sets_remaining;
       begin_ = boost::posix_time::microsec_clock::local_time();
 
-      async_write(socket_, buffer(results_.set_request), bind(&session::set_on_write, shared_from_this(), _1, _2));
+      bool bad_client = bad_client_rate_ && !(action_++ % bad_client_rate_);
+      size_t buf_len = bad_client ? results_.set_request.size() / 2 : results_.set_request.size();
+
+      async_write(
+         socket_, buffer(results_.set_request, buf_len), bind(&session::set_on_write, shared_from_this(), _1, _2));
    }
 
    void set_on_write(const system::error_code& e, size_t bytes_transferred)
@@ -179,6 +203,12 @@ private:
          return fail("set_on_write", e);
 
       results_.bytes_out += bytes_transferred;
+
+      if (bytes_transferred < results_.set_request.size()) // bad client?  hang up and reconnect
+      {
+         session::ptr_type(new session(ios_, results_, host_, port_, bad_client_rate_, action_))->start();
+         return;
+      }
 
       size_t required = 8; // STORED\r\n
       async_read(
@@ -206,6 +236,8 @@ private:
    results& results_;
    string host_;
    size_t port_;
+   size_t bad_client_rate_;
+   size_t action_;
 };
 
 int main(int argc, char * argv[])
@@ -213,7 +245,7 @@ int main(int argc, char * argv[])
    po::options_description generic("Generic options");
 
    string host;
-   size_t port, num_gets, num_sets, item_size, workers;
+   size_t port, num_gets, num_sets, item_size, workers, bad_client_rate;
 
    // options only available via command-line
    generic.add_options()
@@ -224,7 +256,8 @@ int main(int argc, char * argv[])
       ("gets,g", po::value<size_t>(&num_gets)->default_value(10000), "number of gets to issue")
       ("sets,s", po::value<size_t>(&num_sets)->default_value(10000), "number of sets to issue")
       ("item_size,i", po::value<size_t>(&item_size)->default_value(64), "default size of item")
-      ("concurrency,c", po::value<size_t>(&workers)->default_value(10), "number of concurrent workers");
+      ("concurrency,c", po::value<size_t>(&workers)->default_value(10), "number of concurrent workers")
+      ("bad_client_rate,b", po::value<size_t>(&bad_client_rate)->default_value(0), "0 = never, 1 = always, 2 = 1/2 sets/gets are bad, 3 = 1/3 sets/gets are bad...");
 
    po::options_description cmdline_options;
    cmdline_options.add(generic);
@@ -266,7 +299,7 @@ int main(int argc, char * argv[])
    results r(item_size, num_gets, num_sets);
    io_service ios;
    for (size_t i = 0; i != workers; ++i)
-      session::ptr_type(new session(ios, r, host, port))->start();
+      session::ptr_type(new session(ios, r, host, port, bad_client_rate))->start();
 
    posix_time::ptime begin = posix_time::microsec_clock::local_time();
 
