@@ -52,7 +52,7 @@ void handler::parse_request(const system::error_code& e, size_t bytes_transferre
 {
    if (e)
    {
-      if (e != error::eof) // clean close by client
+      if (e != error::eof || in_.size()) // clean close by client?
          log::ERROR("handler<%1%>::handle_read_request: %2%", shared_from_this(), e.message());
       return done(false);
    }
@@ -183,7 +183,7 @@ void handler::get()
       }
       catch (const system::system_error& ex)
       {
-         log::ERROR("handler<%1%>::get_on_pop_close_pre: %2%", shared_from_this(), ex.code().message());
+         log::ERROR("handler<%1%>::get: %2%", shared_from_this(), ex.code().message());
          return done(false, "SERVER_ERROR " + ex.code().message() + "\r\n");
       }
 
@@ -219,7 +219,7 @@ void handler::get_on_queue_return(const boost::system::error_code& e)
    }
    else if (e)
    {
-      log::ERROR("handler<%1%>::get_on_read_first_chunk: %2%", shared_from_this(), e.message());
+      log::ERROR("handler<%1%>::get_on_queue_return: %2%", shared_from_this(), e.message());
       return done(false, "SERVER_ERROR " + e.message() + "\r\n");
    }
    else
