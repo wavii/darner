@@ -155,7 +155,10 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
    }
 
    if (push_stream_->tell() == req_.num_bytes) // are we all done?
+   {
+      push_stream_.reset();
       return done(true, "STORED\r\n");
+   }
 
    // otherwise, second verse, same as the first
    queue::size_type remaining = req_.num_bytes - push_stream_->tell();
@@ -319,7 +322,7 @@ void handler::finalize(const system::error_code& e, size_t bytes_transferred)
    {
       try
       {
-         //push_stream_->cancel();
+         push_stream_->cancel();
       }
       catch (const system::system_error& ex)
       {
