@@ -217,9 +217,13 @@ void handler::get()
 void handler::get_on_queue_return(const boost::system::error_code& e)
 {
    if (e == asio::error::timed_out)
+   {
+      pop_stream_.reset();
       return done(true, "END\r\n");
+   }
    else if (e)
    {
+      pop_stream_.reset();
       log::ERROR("handler<%1%>::get_on_queue_return: %2%", shared_from_this(), e.message());
       return done(false, "SERVER_ERROR " + e.message() + "\r\n");
    }
