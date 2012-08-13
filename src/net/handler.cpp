@@ -157,6 +157,7 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
    if (push_stream_->tell() == req_.num_bytes) // are we all done?
    {
       push_stream_.reset();
+      ++stats_.items_enqueued;
       return done(true, "STORED\r\n");
    }
 
@@ -269,6 +270,7 @@ void handler::get_on_write_chunk(const boost::system::error_code& e, size_t byte
          }
          pop_stream_.reset();
       }
+      ++stats_.items_dequeued;
       return done(true, "\r\nEND\r\n");
    }
    else

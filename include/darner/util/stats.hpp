@@ -31,7 +31,7 @@ struct stats
       out << "STAT uptime " << (now - alive_since).total_seconds() << "\r\n";
       out << "STAT time " << (now - epoch).total_seconds() << "\r\n";
       out << "STAT version " << DARNER_VERSION << "\r\n";
-      out << "STAT curr_items " << items_dequeued - items_enqueued << "\r\n";
+      out << "STAT curr_items " << (items_enqueued > items_dequeued ? items_enqueued - items_dequeued : 0) << "\r\n";
       out << "STAT total_items " << items_enqueued << "\r\n";
       out << "STAT curr_connections " << conns_opened - conns_closed << "\r\n";
       out << "STAT total_connections " << conns_opened << "\r\n";
