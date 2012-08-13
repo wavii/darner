@@ -197,14 +197,13 @@ void handler::get()
 
    if (!pop_stream_->read(buf_))
    {
+      pop_stream_.reset();
+
       // couldn't read... can we at least wait?
       if (req_.wait_ms)
          queues_[req_.queue].wait(req_.wait_ms, bind(&handler::get_on_queue_return, shared_from_this(), _1));
       else
-      {
-         pop_stream_.reset();
          return done(true, "END\r\n");
-      }
    }
    else
       write_first_chunk();
@@ -213,17 +212,24 @@ void handler::get()
 void handler::get_on_queue_return(const boost::system::error_code& e)
 {
    if (e == asio::error::timed_out)
-   {
-      pop_stream_.reset();
       return done(true, "END\r\n");
-   }
    else if (e)
    {
       log::ERROR("handler<%1%>::get_on_queue_return: %2%", shared_from_this(), e.message());
       return done(false, "SERVER_ERROR " + e.message() + "\r\n");
    }
    else
+   {
+      if (!pop_stream_->read(buf_))
+      {
+         // well this is very unusual.  the queue woke us up but nothing is available.
+         pop_stream_.reset();
+         log::ERROR("handler<%1%>::get_on_queue_return: %2%", shared_from_this(), "bad queue_return");
+         return done(false, "SERVER_ERROR bad queue return\r\n");
+      }
+
       write_first_chunk();
+   }
 }
 
 void handler::write_first_chunk()
