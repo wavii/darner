@@ -200,13 +200,14 @@ void handler::get()
 
    if (!pop_stream_->read(buf_))
    {
-      pop_stream_.reset();
-
       // couldn't read... can we at least wait?
       if (req_.wait_ms)
          queues_[req_.queue].wait(req_.wait_ms, bind(&handler::get_on_queue_return, shared_from_this(), _1));
       else
+      {
+         pop_stream_.reset();
          return done(true, "END\r\n");
+      }
    }
    else
       write_first_chunk();
