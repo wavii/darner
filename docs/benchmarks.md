@@ -7,7 +7,7 @@ Benchmark Details:
 
 # Resident Memory
 
-How much memory does the queue server use?  We are testing both steady-state requirements, and also how aggressively
+How much memory does the queue server use?  We are testing both steady-state memory resident, and also how aggressively
 the server acquires and releases memory as queues expand and contract.  We tuned Kestrel's JVM down to the smallest
 heap that didn't cause OOM's and didn't impact performance: `-Xmx256m -Xms256m`.
 
