@@ -1,74 +1,65 @@
-Darner
-======
+# Darner
 
-Darner is a very simple message queue built on [boost::asio](http://www.boost.org/libs/asio/) and
-[leveldb](http://code.google.com/p/leveldb/).  It supports the memcache protocol.
+Darner is a very simple message queue server.  Unlike in-memory servers such as [redis](http://redis.io/), Darner is
+designed to handle queues much larger than what can be held in RAM.  And unlike enterprise queue servers such as
+[RabbitMQ](http://www.rabbitmq.com/), Darner keeps all messages **out of process**, relying instead on the kernel's
+virtual memory manager via [log-structured storage](https://code.google.com/p/leveldb/).
 
-A single darner server has a set of queues identified by name, which is also the filename of that queue's journal file.
-Each queue is a strictly-ordered FIFO of items of binary data.
+The result is a durable queue server that uses a small amount of in-resident memory regardless of queue size, while
+still achieving [remarkable performance](/wavii/darner/blob/master/docs/benchmarks.md).
 
-### Protocol
-------------
+Darner is based on Robey Pointer's [Kestrel](/robey/kestrel) simple, distributed message queue.  Like Kestrel, Darner
+follows the "No talking! Shhh!" approach to distributed queues:  A single Darner server has a set of queues identified
+by name.  Each queue is a strictly-ordered FIFO, and querying from a fleet of Darner servers provides a loosely-ordered
+queue.  Darner also supports Kestrel's two-phase reliable fetch: if a client disconnects before confirming it handled
+a message, the message will be handed to the next client.
 
-The official memcache protocol is described here:
-[protocol.txt](https://github.com/memcached/memcached/blob/master/doc/protocol.txt)
+Compared to Kestrel, Darner boasts much higher throughput, better concurrency, an order of magnitude better tp99, and
+uses an order of magnitude less memory.  But Darner has less configuration, and far fewer features than Kestrel. Check
+out the [benchmarks](/wavii/darner/blob/master/docs/benchmarks.md)!
 
-The darner implementation of the memcache protocol commands is described below.
+Darner is used at [Wavii](http://wavii.com/), and is written and maintained by [Erik Frey](/erikfrey).
 
-- `SET <queue-name> <# bytes>`
+## Installing
 
-  Add an item to a queue. It may fail if the queue has a size or item limit and it's full.
+You'll need build tools, [CMake](http://www.cmake.org/), [Boost](http://www.boost.org/), and
+[LevelDB](https://code.google.com/p/leveldb/)/[snappy](https://code.google.com/p/snappy/) to build Darner:
 
-- `GET <queue-name>[options]`
+```bash
+sudo apt-get install -y build-essential cmake libboost-all-dev libsnappy-dev
+wget https://leveldb.googlecode.com/files/leveldb-1.5.0.tar.gz
+tar xvzf leveldb-1.5.0.tar.gz && cd leveldb
+make
+sudo mv libleveldb.* /usr/local/lib/ && sudo chown root:root /usr/local/lib/libleveldb.*
+cd ..
+```
 
-  Remove an item from a queue. It will return an empty response immediately if the queue is empty. The queue name may be
-  followed by options separated by `/`:
+Then you can fetch and install Darner:
 
-    - `/t=<milliseconds>`
+```bash
+git clone git@github.com:wavii/darner.git
+cd darner
+cmake . && make && sudo make install
+```
 
-      Wait up to a given time limit for a new item to arrive. If an item arrives on the queue within this timeout, it's
-      returned as normal. Otherwise, after that timeout, an empty response is returned.
+## Running
 
-    - `/open`
+Make a directory for Darner to store its queues, say `/var/spool/darner/`, then run Darner like so.
 
-      Tentatively remove an item from the queue. The item is returned as usual but is also set aside in case the client
-      disappears before sending a "close" request. (See "Reliable Reads" below.)
+```bash
+vagrant@ubuntu-oneiric:~/workspace/darner$ ./darner -d /var/spool/darner/
+[INFO] 2012-Aug-13 03:59:41.047739: darner: queue server
+[INFO] 2012-Aug-13 03:59:41.048051: build: Aug 12 2012 (22:24:28) v0.0.1 (c) Wavii, Inc.
+[INFO] 2012-Aug-13 03:59:41.048132: listening on port: 22133
+[INFO] 2012-Aug-13 03:59:41.048507: data dir: /var/spool/darner/
+[INFO] 2012-Aug-13 03:59:41.048798: starting up
+```
 
-    - `/close`
+Voila!  By default, Darner listens on port 22133.
 
-      Close any existing open read. (See "Reliable Reads" below.)
+## Protocol
 
-    - `/abort`
+Darner follows the same protocol as [Kestrel](/robey/kestrel/blob/master/docs/guide.md#memcache), which is the memcache
+protocol.
 
-      Cancel any existing open read, returing that item to the head of the queue. It will be the next item fetched.
-
-  For example, to open a new read, waiting up to 500msec for an item:
-
-        GET work/t=500/open
-
-  Or to close an existing read and open a new one:
-
-        GET work/close/open
-
-- `DELETE <queue-name>`
-
-  Drop a queue, discarding any items in it, and deleting any associated journal files.
-
-- `FLUSH <queue-name>`
-
-  Discard all items remaining in this queue. The queue remains live and new items can be added. The time it takes to
-  flush will be linear to the current queue size, and any other activity on this queue will block while it's being
-  flushed.
-
-- `FLUSH_ALL`
-
-  Discard all items remaining in all queues. The queues are flushed one at a time, as if kestrel received a `FLUSH`
-  command for each queue.
-
-- `VERSION`
-
-  Display the kestrel version in a way compatible with memcache.
-
-- `STATS`
-
-  Display server stats in memcache style. They're described below.
+Currently missing from the Darner implementation but TODO: `/peek`, `FLUSH`, `FLUSH_ALL`, `DELETE`, and some stats.
