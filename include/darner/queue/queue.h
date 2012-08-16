@@ -8,7 +8,6 @@
 #include <boost/array.hpp>
 #include <boost/ptr_container/ptr_list.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/optional.hpp>
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -22,11 +21,10 @@ namespace darner {
  * queue is a fifo queue that is O(log(queue size / cache size)) for pushing/popping.  it boasts these features:
  *
  * - an evented wait semantic for queue poppers
- * - items are first checked out, then later deleted or returned back into the queue
+ * - popping is two-phase with a begin and an end. ending a pop can either erase it or return it back to the queue.
  * - large items are streamed in a chunk at a time
  *
- * queue will post events such as journal writes and waits to a provided boost::asio io_service.  interrupting the
- * io_service with pending events is okay - queue is never in an inconsistent state between io events.
+ * all queue methods are synchronous except for wait(), which starts an async timer on the provided io_service.
  *
  * queue is not thread-safe, it assumes a single-thread calling and operating the provided io_service
  */
@@ -34,15 +32,17 @@ class queue
 {
 public:
 
+   // a queue can only ever have a backlog of 2^64 items.  so at darner's current peak throughput you can only run the
+   // server for 23 million years     :(
    typedef boost::uint64_t id_type;
    typedef boost::uint64_t size_type;
-   typedef boost::function<void (const boost::system::error_code& error)> success_callback;
+   typedef boost::function<void (const boost::system::error_code& error)> wait_callback;
 
    // open or create the queue at the path
    queue(boost::asio::io_service& ios, const std::string& path);
 
    // wait up to wait_ms milliseconds for an item to become available, then call cb with success or timeout
-   void wait(size_type wait_ms, const success_callback& cb);
+   void wait(size_type wait_ms, const wait_callback& cb);
 
    // returns the number of items in the queue
    size_type count() const;
@@ -60,7 +60,7 @@ protected:
    {
    public:
 
-      header_type() : beg(0), end(0), size(0) {}
+      header_type() : beg(0), end(1), size(0) {}
       header_type(id_type _beg, id_type _end, size_type _size)
       : beg(_beg), end(_end), size(_size) {}
       header_type(const std::string& buf)
@@ -79,43 +79,50 @@ protected:
       mutable std::string buf_;
    };
 
-   // queue methods:
+   // queue methods aren't meant to be used directly.  instead create an iqstream or oqstream to use it
 
    /*
-    * pushes a value to to the queue. returns true for success, false if there was a problem writing to the journal
+    * pushes an item to to the queue.
     */
-   void push(boost::optional<id_type>& result, const std::string& value);
+   void push(id_type& result, const std::string& item);
 
    /*
-    * pushes a header to to the queue.  call this after inserting a range of data chunks.
+    * pushes a header to to the queue.  a header points to a range of chunks in a multi-chunk item.
     */
-   void push(boost::optional<id_type>& result, const header_type& value);
+   void push(id_type& result, const header_type& header);
 
    /*
-    * begins the popping of an item.  if the item is a single chunk, pops the value, otherwise just pops the
-    * header.  will wait wait_ms milliseconds for an item to become available before either returning a succes
-    * or timeout status to the callback cb
+    * begins popping an item.  if no items are available, immediately returns false.  once an item pop is begun,
+    * it is owned solely by the caller, and must eventually be pop_ended.  pop_begin is constant time.
     */
-   bool pop_open(boost::optional<id_type>& result_id, boost::optional<header_type>& result_header,
-      std::string& result_value);
+   bool pop_begin(id_type& result);
 
    /*
-    * finishes the popping of an item.  if remove = true, deletes the dang ol' item, otherwise returns it
-    * back into the queue
+    * once has a pop has begun, call pop_read.  if the item is just one chunk (end - beg < 2), result_item will be
+    * immediately populated, otherwise fetch the chunks in the header's range [beg, end).
     */
-   void pop_close(bool remove, id_type id, const boost::optional<header_type>& header);
+   void pop_read(std::string& result_item, header_type& result_header, id_type id);
+
+   /*
+    * finishes the popping of an item.  if erase = true, deletes the dang ol' item, otherwise returns it
+    * back to its position near the tail of the queue.  closing an item with erase = true is constant time, but
+    * closing an item with erase = false could take logn time and linear memory for # returned items.
+    *
+    * the simplest way to address this is to limit the number of items that can be opened at once.
+    */
+   void pop_end(bool erase, id_type id, const header_type& header);
 
    // chunk methods:
 
    /*
-    * returns a header with a range of reserved chunks
+    * returns to a header a range of reserved chunks
     */
-   void reserve_chunks(boost::optional<header_type>& result, size_type chunks);
+   void reserve_chunks(header_type& result, size_type count);
 
    /*
     * writes a chunk
     */
-   void write_chunk(const std::string& value, id_type chunk_key);
+   void write_chunk(const std::string& chunk, id_type chunk_key);
 
    /*
     * reads a chunk
@@ -123,7 +130,7 @@ protected:
    void read_chunk(std::string& result, id_type chunk_key);
 
    /*
-    * removes all chunks referred to by a header
+    * removes all chunks referred to by a header.  use this when aborting a multi-chunk push.
     */
    void erase_chunks(const header_type& header);
 
@@ -157,13 +164,13 @@ private:
    // ties a set of results to a deadline timer
    struct waiter
    {
-      waiter(boost::asio::io_service& ios, size_type wait_ms, const success_callback& _cb)
+      waiter(boost::asio::io_service& ios, size_type wait_ms, const wait_callback& _cb)
       : cb(_cb),
         timer(ios, boost::posix_time::milliseconds(wait_ms))
       {
       }
 
-      success_callback cb;
+      wait_callback cb;
       boost::asio::deadline_timer timer;
    };
 
@@ -183,8 +190,28 @@ private:
    // any operation that mutates the queue or the waiter state should run this to crank any pending events
    void spin_waiters();
 
-   // fires either if timer times out, or is canceled
+   // fires either if timer times out or is canceled
    void waiter_timeout(const boost::system::error_code& e, boost::ptr_list<waiter>::iterator waiter_it);
+
+   // some leveldb sugar:
+
+   void put(const key_type& key, const std::string& value)
+   {
+      if (!journal_->Put(leveldb::WriteOptions(), key.slice(), value).ok())
+         throw boost::system::system_error(boost::system::errc::io_error, boost::system::system_category());
+   }
+
+   void get(const key_type& key, std::string& result)
+   {
+      if (!journal_->Get(leveldb::ReadOptions(), key.slice(), &result).ok())
+         throw boost::system::system_error(boost::system::errc::io_error, boost::system::system_category());
+   }
+
+   void write(leveldb::WriteBatch& batch)
+   {
+      if (!journal_->Write(leveldb::WriteOptions(), &batch).ok())
+         throw boost::system::system_error(boost::system::errc::io_error, boost::system::system_category());
+   }
 
    boost::scoped_ptr<comparator> cmp_;
    boost::scoped_ptr<leveldb::DB> journal_;

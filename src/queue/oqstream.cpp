@@ -1,60 +1,74 @@
 #include "darner/queue/oqstream.h"
 
-#include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <stdexcept>
 
-#include <leveldb/write_batch.h>
+#include <boost/asio.hpp>
+
+#include "darner/util/log.h"
 
 using namespace std;
 using namespace boost;
 using namespace darner;
 
-oqstream::oqstream(queue& _queue, queue::size_type chunks)
-: queue_(_queue),
-  chunks_(chunks),
-  chunk_pos_(0),
-  tell_(0)
+oqstream::~oqstream()
 {
+   if (queue_)
+   {
+      try
+      {
+         cancel();
+      }
+      catch (const std::exception& e) // we're in the dtor!  we have to swallow everything
+      {
+         log::ERROR("oqstream::~oqstream(): %1%", e.what());
+      }
+      catch (...)
+      {
+         log::ERROR("oqstream::~oqstream(): unknown error");
+      }
+   }
 }
 
-void oqstream::write(const std::string& value)
+void oqstream::open(boost::shared_ptr<queue> queue, queue::size_type chunks_count)
 {
-   if (id_) // have an id already?  that's a paddlin'
+   if (queue_) // already open?  that's a paddlin'
+      throw system::system_error(asio::error::already_open);
+
+   queue_ = queue;
+   header_ = queue::header_type();
+   if (chunks_count > 1)
+      queue_->reserve_chunks(header_, chunks_count);
+   chunk_pos_ = header_.beg;
+}
+
+void oqstream::write(const std::string& chunk)
+{
+  if (!queue_ || chunk_pos_ == header_.end)
       throw system::system_error(asio::error::eof);
 
-   if (chunks_ == 1) // just one chunk? push it on
+   if (header_.end <= 1) // just one chunk? push it on
+      queue_->push(id_, chunk);
+   else
+      queue_->write_chunk(chunk, chunk_pos_);
+
+   header_.size += chunk.size();
+
+   if (++chunk_pos_ == header_.end) // time to close up shop?
    {
-      queue_.push(id_, value);
-      tell_ += value.size();
-      return;
+      if (header_.end > 1) // multi-chunk?  push the header
+         queue_->push(id_, header_);
+      queue_.reset();
    }
-
-   if (!header_)  // reserve a swath of chunks if we haven't already
-   {
-      queue_.reserve_chunks(header_, chunks_);
-      chunk_pos_ = header_->beg;
-   }
-
-   queue_.write_chunk(value, chunk_pos_);
-
-   tell_ += value.size();
-   header_->size += value.size();
-
-   if (++chunk_pos_ == header_->end) // time to push the item?
-      queue_.push(id_, *header_);
 }
 
 void oqstream::cancel()
 {
-   if (id_) // can't cancel if we already pushed all the chunks
-      throw system::system_error(asio::error::invalid_argument);
+   if (!queue_)
+      throw system::system_error(asio::error::eof); // not gon' do it
 
-   if (!header_) // nothing wrong with canceling nothing
-      return;
+   if (header_.end > 1) // multi-chunk? erase them
+      queue_->erase_chunks(header_);
 
-   queue_.erase_chunks(*header_);
-
-   header_.reset();
-   chunk_pos_ = tell_ = 0;
+   queue_.reset();
 }
 

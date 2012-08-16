@@ -46,7 +46,7 @@ queue::queue(asio::io_service& ios, const string& path)
    }
 }
 
-void queue::wait(size_type wait_ms, const success_callback& cb)
+void queue::wait(size_type wait_ms, const wait_callback& cb)
 {
    ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, wait_ms, cb));
    it->timer.async_wait(bind(&queue::waiter_timeout, this, asio::placeholders::error, it));
@@ -66,82 +66,77 @@ void queue::write_stats(const string& name, ostringstream& out) const
 
 // protected:
 
-void queue::push(optional<id_type>& result, const string& value)
+void queue::push(id_type& result, const string& item)
 {
-   // values that end in 0 are escaped to (0, 0), so we can distinguish them from headers (which end in (1, 0))
-   if (value[value.size() - 1] == '\0')
-   {
-      string new_value = value + '\0';
-      if (!journal_->Put(leveldb::WriteOptions(), queue_head_.slice(), new_value).ok())
-         throw system::system_error(system::errc::io_error, system::system_category());
-   }
-   else if (!journal_->Put(leveldb::WriteOptions(), queue_head_.slice(), value).ok())
-      throw system::system_error(system::errc::io_error, system::system_category());
+   // items that end in 0 are escaped to (0, 0), so we can distinguish them from headers (which end in (1, 0))
+   if (item[item.size() - 1] == '\0')
+      put(queue_head_, item + '\0');
+   else
+      put(queue_head_, item);
 
    result = queue_head_.id++;
 
    spin_waiters(); // in case there's a waiter waiting for this new item
 }
 
-void queue::push(optional<id_type>& result, const header_type& value)
+void queue::push(id_type& result, const header_type& header)
 {
-   if (!journal_->Put(leveldb::WriteOptions(), queue_head_.slice(), value.str()).ok())
-      throw system::system_error(system::errc::io_error, system::system_category());
+   put(queue_head_.slice(), header.str());
 
    result = queue_head_.id++;
 
    spin_waiters(); // in case there's a waiter waiting for this new item
 }
 
-bool queue::pop_open(optional<id_type>& result_id, optional<header_type>& result_header, string& result_value)
+bool queue::pop_begin(id_type& result)
 {
    if (!returned_.empty())
    {
-      result_id = *returned_.begin();
+      result = *returned_.begin();
       returned_.erase(returned_.begin());
    }
    else if (queue_tail_.id != queue_head_.id)
-      result_id = queue_tail_.id++;
+      result = queue_tail_.id++;
    else
       return false;
 
-   if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_QUEUE, *result_id).slice(), &result_value).ok())
-      throw system::system_error(system::errc::io_error, system::system_category());
+   return true;
+}
+
+void queue::pop_read(std::string& result_item, header_type& result_header, id_type id)
+{
+   get(key_type(key_type::KT_QUEUE, id), result_item);
+
+   result_header = header_type();
 
    // check the escapes
-   if (result_value.size() > 2 && result_value[result_value.size() - 1] == '\0')
+   if (result_item.size() > 2 && result_item[result_item.size() - 1] == '\0')
    {
-      if (result_value[result_value.size() - 2] == '\1') // \1 \0 means header
-      {
-         result_header = header_type(result_value);
-         if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_CHUNK, result_header->beg).slice(),
-            &result_value).ok())
-            throw system::system_error(system::errc::io_error, system::system_category());
-      }
-      else if (result_value[result_value.size() - 2] == '\0') // \0 \0 means escaped \0
-         result_value.resize(result_value.size() - 1);
+      if (result_item[result_item.size() - 2] == '\1') // \1 \0 means header
+         result_header = header_type(result_item);
+      else if (result_item[result_item.size() - 2] == '\0') // \0 \0 means escaped \0
+         result_item.resize(result_item.size() - 1);
       else
          throw system::system_error(system::errc::io_error, system::system_category()); // anything else is bad data
    }
 
    ++items_open_;
-
-   return true;
 }
 
-void queue::pop_close(bool remove, id_type id, const optional<header_type>& header)
+void queue::pop_end(bool erase, id_type id, const header_type& header)
 {
-   if (remove)
+   if (erase)
    {
       leveldb::WriteBatch batch;
       batch.Delete(key_type(key_type::KT_QUEUE, id).slice());
 
-      if (header)
-         for (key_type k(key_type::KT_CHUNK, header->beg); k.id != header->end; ++k.id)
+      if (header.end > 1) // multi-chunk?
+      {
+         for (key_type k(key_type::KT_CHUNK, header.beg); k.id != header.end; ++k.id)
             batch.Delete(k.slice());
+      }
 
-      if (!journal_->Write(leveldb::WriteOptions(), &batch).ok())
-         throw system::system_error(system::errc::io_error, system::system_category());
+      write(batch);
 
       // leveldb is conservative about reclaiming deleted keys, of which there will be many when a queue grows and
       // later shrinks.  let's explicitly force it to compact every 1024 deletes
@@ -159,22 +154,20 @@ void queue::pop_close(bool remove, id_type id, const optional<header_type>& head
    --items_open_;
 }
 
-void queue::reserve_chunks(optional<header_type>& result, size_type chunks)
+void queue::reserve_chunks(header_type& result, size_type count)
 {
-   result = header_type(chunks_head_.id, chunks_head_.id + chunks, 0);
-   chunks_head_.id += chunks;
+   result = header_type(chunks_head_.id, chunks_head_.id + count, 0);
+   chunks_head_.id += count;
 }
 
-void queue::write_chunk(const string& value, id_type chunk_key)
+void queue::write_chunk(const string& chunk, id_type chunk_key)
 {
-   if (!journal_->Put(leveldb::WriteOptions(), key_type(key_type::KT_CHUNK, chunk_key).slice(), value).ok())
-      throw system::system_error(system::errc::io_error, system::system_category());
+   put(key_type(key_type::KT_CHUNK, chunk_key), chunk);
 }
 
 void queue::read_chunk(string& result, id_type chunk_key)
 {
-   if (!journal_->Get(leveldb::ReadOptions(), key_type(key_type::KT_CHUNK, chunk_key).slice(), &result).ok())
-      throw system::system_error(system::errc::io_error, system::system_category());
+   get(key_type(key_type::KT_CHUNK, chunk_key), result);
 }
 
 void queue::erase_chunks(const header_type& header)
@@ -184,18 +177,15 @@ void queue::erase_chunks(const header_type& header)
    for (key_type k(key_type::KT_CHUNK, header.beg); k.id != header.end; ++k.id)
       batch.Delete(k.slice());
 
-   if (!journal_->Write(leveldb::WriteOptions(), &batch).ok())
-      throw system::system_error(system::errc::io_error, system::system_category());
+   write(batch);
 }
 
 // private:
 
 void queue::spin_waiters()
 {
-   while (true)
+   while (!waiters_.empty() && (!returned_.empty() || queue_tail_.id < queue_head_.id))
    {
-      if (waiters_.empty() || (returned_.empty() && queue_tail_.id == queue_head_.id))
-         break;
       ptr_list<waiter>::auto_type waiter = waiters_.release(waiters_.begin());
       waiter->timer.cancel();
       waiter->cb(system::error_code());

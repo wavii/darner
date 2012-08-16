@@ -1,9 +1,10 @@
 #ifndef __DARNER_HANDLER_HPP__
 #define __DARNER_HANDLER_HPP__
 
+#include <sstream>
+
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
-#include <boost/optional.hpp>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 
@@ -76,10 +77,40 @@ private:
 
    // utils
 
-   // call done after a successful call or a failure. on fail, ensures the handler cleans up
-   void done(bool success, const std::string& msg = "");
+   void end(const char* msg = "END\r\n")
+   {
+      boost::asio::async_write(
+         socket_, boost::asio::buffer(msg), boost::bind(&handler::read_request, shared_from_this(), _1, _2));
+   }
 
-   void finalize(const boost::system::error_code& e, size_t bytes_transferred);
+   void error(const char* msg, const char* error_type = "ERROR")
+   {
+      std::ostringstream oss;
+      oss << error_type << ' ' << msg << "\r\n";
+      buf_ = oss.str();
+
+      boost::asio::async_write(
+         socket_, boost::asio::buffer(buf_), boost::bind(&handler::hang_up, shared_from_this(), _1, _2));
+   }
+
+   void error(const char* location, const boost::system::error_code& e)
+   {
+      log::ERROR("handler<%1%>::%2%: %3%", shared_from_this(), location, e.message());
+   }
+
+   void error(const char* location, const boost::system::system_error& ex, bool echo = true)
+   {
+      log::ERROR("handler<%1%>::%2%: %3%", shared_from_this(), location, ex.code().message());
+
+      if (echo)
+      {
+         buf_ = "SERVER_ERROR " + ex.code().message() + "\r\n";
+         boost::asio::async_write(
+            socket_, boost::asio::buffer(buf_), boost::bind(&handler::hang_up, shared_from_this(), _1, _2));      
+      }
+   }
+
+   void hang_up(const boost::system::error_code& e, size_t bytes_transferred) {}
 
    const queue::size_type chunk_size_;
 
@@ -92,8 +123,8 @@ private:
    std::string buf_;
    request req_;
 
-   boost::optional<iqstream> pop_stream_;
-   boost::optional<oqstream> push_stream_;
+   iqstream pop_stream_;
+   oqstream push_stream_;
 };
 
 } // darner
