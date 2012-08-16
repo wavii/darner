@@ -1,54 +1,60 @@
 #include "darner/queue/iqstream.h"
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
-
-#include <leveldb/write_batch.h>
 
 using namespace std;
 using namespace boost;
 using namespace darner;
 
-iqstream::iqstream(queue& _queue)
-: queue_(_queue),
-  chunk_pos_(0),
-  tell_(0)
+iqstream::~iqstream()
 {
+   if (queue_)
+      queue_->pop_end(false, id_, header_);
 }
 
-bool iqstream::read(string& result)
+bool iqstream::open(shared_ptr<queue> queue)
 {
-   if (!id_) // should we try to fetch a queue item?
-   {
-      if (!queue_.pop_open(id_, header_, result))
-         return false;
+   if (queue_)
+      throw system::system_error(asio::error::already_open); // can't open what's open
 
-      if (!header_) // not multi-chunk?  we're done!
-      {
-         tell_ += result.size();
-         return true;
-      }
+   if (!queue->pop_begin(id_))
+      return false;
 
-      chunk_pos_ = header_->beg;
-   }
-
-   // if we have an id already, and are still requesting more reads, we must be multi-chunk
-   // make sure that's the cast, and that we haven't read past the end
-   if (!header_ || chunk_pos_ >= header_->end)
-      throw system::system_error(asio::error::eof);
-
-   queue_.read_chunk(result, chunk_pos_);
-
-   ++chunk_pos_;
-   tell_ += result.size();
+   queue_ = queue;
+   header_ = queue::header_type();
+   chunk_pos_ = header_.beg;
+   tell_ = 0;
 
    return true;
 }
 
-void iqstream::close(bool remove)
+void iqstream::read(string& result)
 {
-   if (!id_)
-      throw system::system_error(asio::error::not_found); // can't close something we haven't opened
+   // not open or already read past end
+   if (!queue_ || chunk_pos_ >= header_.end)
+      throw system::system_error(asio::error::eof);
 
-   queue_.pop_close(remove, *id_, header_);
+   if (!chunk_pos_) // first read?  check if there's a header
+   {
+      queue_->pop_read(result, header_, id_);
+      if (header_.end > 1)
+         chunk_pos_ = header_.beg;
+      else
+         header_.size = result.size();
+   }
+
+   if (header_.end > 1) // multi-chunk?  get the next chunk!
+      queue_->read_chunk(result, chunk_pos_);
+
+   ++chunk_pos_;
+   tell_ += result.size();
+}
+
+void iqstream::close(bool erase)
+{
+   if (!queue_)
+      return; // it's not an error to close more than once
+
+   queue_->pop_end(erase, id_, header_);
+   queue_.reset();
 }

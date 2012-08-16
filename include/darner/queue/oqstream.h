@@ -1,8 +1,7 @@
 #ifndef __DARNER_QUEUE_OQSTREAM_H__
 #define __DARNER_QUEUE_OQSTREAM_H__
 
-#include <boost/optional.hpp>
-#include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "darner/queue/queue.h"
 
@@ -12,32 +11,39 @@ class oqstream
 {
 public:
 
-   oqstream(queue& _queue, queue::size_type chunks);
+   /*
+    * destroying an unfinished oqstream will cancel it
+    */
+   ~oqstream();
+
+   /*
+    * immediately opens an oqstream for writing.  the stream will automatically close after chunks_count chunks
+    * have been written
+    */
+   void open(boost::shared_ptr<queue> queue, queue::size_type chunks_count);
 
    /*
     * writes a chunk of the item. fails if more chunks are written than originally reserved.
     */
-   void write(const std::string& value);
+   void write(const std::string& chunk);
 
    /*
-    * cancels the oqstream write.  only available to mutli-chunks that haven't written all their chunks yet.
+    * cancels the oqstream write.  only available if the stream hasn't written chunks_count chunks yet
     */
    void cancel();
 
    /*
     * returns the position in the stream in bytes.
     */
-   queue::size_type tell() const { return tell_; }
+   queue::size_type tell() const { return header_.size; }
    
 private:
 
-   queue& queue_;
-   queue::size_type chunks_;
+   boost::shared_ptr<queue> queue_;
 
-   boost::optional<queue::id_type> id_; // id of key in queue, only set after all chunks are written
-   boost::optional<queue::header_type> header_; // only set if it's multi-chunk
+   queue::id_type id_; // id of key in queue, only set after all chunks are written
+   queue::header_type header_; // only set if it's multi-chunk
    queue::size_type chunk_pos_;
-   queue::size_type tell_;
 };
 
 } // darner

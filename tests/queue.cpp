@@ -18,16 +18,19 @@ BOOST_FIXTURE_TEST_CASE( test_push_pop, fixtures::basic_queue )
 {
    string value = "I hate when I'm on a flight and I wake up with a water bottle next to me like oh great now I gotta "
                   "be responsible for this water bottle";
-   oqstream(*queue_, 1).write(value);
-   iqstream(*queue_).read(pop_value_);
+   oqs_.open(queue_, 1);
+   oqs_.write(value);
 
+   BOOST_REQUIRE(iqs_.open(queue_));
+
+   iqs_.read(pop_value_);
    BOOST_REQUIRE_EQUAL(value, pop_value_);
 }
 
 // test having nothing to pop
 BOOST_FIXTURE_TEST_CASE( test_pop_empty, fixtures::basic_queue )
 {
-   BOOST_REQUIRE(!iqstream(*queue_).read(pop_value_));
+   BOOST_REQUIRE(!iqs_.open(queue_));
 }
 
 // test a pop wait
@@ -37,7 +40,7 @@ BOOST_FIXTURE_TEST_CASE( test_pop_wait, fixtures::basic_queue )
                   "elevator sometimes, my 7 floor sanctuary";
    deadline_timer timer(ios_, posix_time::milliseconds(10));
    timer.async_wait(bind(&fixtures::basic_queue::delayed_push, this, ref(value), _1));
-   queue_->wait(100, success_cb_);
+   queue_->wait(100, wait_cb_);
    ios_.run();
 
    BOOST_REQUIRE(!error_);
@@ -49,7 +52,7 @@ BOOST_FIXTURE_TEST_CASE( test_pop_wait_timeout, fixtures::basic_queue )
    string value = "Classical music is tight yo";
    deadline_timer timer(ios_, posix_time::milliseconds(50));
    timer.async_wait(bind(&fixtures::basic_queue::delayed_push, this, ref(value), _1));
-   queue_->wait(10, success_cb_);
+   queue_->wait(10, wait_cb_);
    ios_.run();
 
    BOOST_REQUIRE(error_);
@@ -61,11 +64,13 @@ BOOST_FIXTURE_TEST_CASE( test_queue_close_reopen, fixtures::basic_queue )
    string value = "Do you know where to find marble conference tables? I’m looking to have a conference…not until I "
                   "get the table though";
 
-   oqstream(*queue_, 1).write(value);
+   oqs_.open(queue_, 1);
+   oqs_.write(value);
    queue_.reset(new darner::queue(ios_, (tmp_ / "queue").string()));
    BOOST_REQUIRE_EQUAL(queue_->count(), 1);
 
-   iqstream(*queue_).read(pop_value_);
+   iqs_.open(queue_);
+   iqs_.read(pop_value_);
    BOOST_REQUIRE_EQUAL(pop_value_, value);
 }
 
@@ -74,16 +79,16 @@ BOOST_FIXTURE_TEST_CASE( test_queue_count, fixtures::basic_queue )
 {
    string value = "NO ALCOHOL BEFORE TATTOOS";
 
-   oqstream(*queue_, 1).write(value);
+   oqs_.open(queue_, 1);
+   oqs_.write(value);
    BOOST_REQUIRE_EQUAL(queue_->count(), 1);
 
    // even beginning a pop lowers the count...
-   iqstream is(*queue_);
-   is.read(pop_value_);
+   iqs_.open(queue_);
    BOOST_REQUIRE_EQUAL(queue_->count(), 0);
 
    // but returning it raises it back up
-   is.close(false);
+   iqs_.close(false);
    BOOST_REQUIRE_EQUAL(queue_->count(), 1);
 }
 
@@ -92,9 +97,9 @@ BOOST_FIXTURE_TEST_CASE( test_oqstream_overflow, fixtures::basic_queue )
 {
    string value = "I would like to thank Julius Caesar for originating my hairstyle";
 
-   oqstream os(*queue_, 1);
-   os.write(value);
-   BOOST_REQUIRE_THROW(os.write(value), system::system_error);
+   oqs_.open(queue_, 1);
+   oqs_.write(value);
+   BOOST_REQUIRE_THROW(oqs_.write(value), system::system_error);
 }
 
 // test that we can push/pop multi-chunked
@@ -102,54 +107,57 @@ BOOST_FIXTURE_TEST_CASE( test_multi_chunked, fixtures::basic_queue )
 {
    string value1 = "I don’t ever watch dramas on a plane... I don’t be wanting to reflect";
    string value2 = "I make awesome decisions in bike stores!!!";
-   oqstream os(*queue_, 2);
-   os.write(value1);
+   oqs_.open(queue_, 2);
+   oqs_.write(value1);
 
    BOOST_REQUIRE_EQUAL(queue_->count(), 0); // not ready yet...
-   BOOST_REQUIRE_EQUAL(os.tell(), value1.size());
+   BOOST_REQUIRE_EQUAL(oqs_.tell(), value1.size());
 
-   os.write(value2);
+   oqs_.write(value2);
    BOOST_REQUIRE_EQUAL(queue_->count(), 1); // okay it's done
-   BOOST_REQUIRE_EQUAL(os.tell(), value1.size() + value2.size());
+   BOOST_REQUIRE_EQUAL(oqs_.tell(), value1.size() + value2.size());
 
-   // even beginning a pop lowers the count...
-   iqstream is(*queue_);
-   is.read(pop_value_);
-   BOOST_REQUIRE_EQUAL(queue_->count(), 0);
-   BOOST_REQUIRE_EQUAL(is.tell(), value1.size());
-   BOOST_REQUIRE_EQUAL(is.size(), value1.size() + value2.size());
+   iqs_.open(queue_);
+   iqs_.read(pop_value_);
+   BOOST_REQUIRE_EQUAL(queue_->count(), 0); // even beginning a pop lowers the count...
+   BOOST_REQUIRE_EQUAL(iqs_.tell(), value1.size());
+   BOOST_REQUIRE_EQUAL(iqs_.size(), value1.size() + value2.size());
    BOOST_REQUIRE_EQUAL(pop_value_, value1);
 
-   is.read(pop_value_);
-   BOOST_REQUIRE_EQUAL(is.tell(), value1.size() + value2.size());
+   iqs_.read(pop_value_);
+   BOOST_REQUIRE_EQUAL(iqs_.tell(), value1.size() + value2.size());
    BOOST_REQUIRE_EQUAL(pop_value_, value2);
 
    // finally, the delete
-   is.close(true);
+   iqs_.close(true);
 
    // should be nothing left to pop
-   BOOST_REQUIRE(!iqstream(*queue_).read(pop_value_));
+   BOOST_REQUIRE(!iqs_.open(queue_));
 }
 
 // test that we can cancel a multi-chunked push
 BOOST_FIXTURE_TEST_CASE( test_push_cancel, fixtures::basic_queue )
 {
    string value = "I ordered the salmon medium instead of medium well I didn’t want to ruin the magic";
-   oqstream os(*queue_, 2);
-   os.write(value);
+   oqs_.open(queue_, 2);
+   oqs_.write(value);
 
-   BOOST_REQUIRE_EQUAL(os.tell(), value.size());
+   BOOST_REQUIRE_EQUAL(oqs_.tell(), value.size());
 
-   os.cancel();
-   BOOST_REQUIRE_EQUAL(os.tell(), 0);
+   oqs_.cancel();
+
+   // shouldn't be able to finish the push now
+   BOOST_REQUIRE_THROW(oqs_.write(value), system::system_error);
 }
 
 // test that we can push a value that ends in a null-zero
 BOOST_FIXTURE_TEST_CASE( test_push_zero, fixtures::basic_queue )
 {
    string value = string("I'm sorry Taylor.") + '\0';
-   oqstream(*queue_, 1).write(value);
-   iqstream(*queue_).read(pop_value_);
+   oqs_.open(queue_, 1);
+   oqs_.write(value);
+   iqs_.open(queue_);
+   iqs_.read(pop_value_);
 
    BOOST_REQUIRE_EQUAL(value, pop_value_);
 }
