@@ -187,11 +187,11 @@ private:
       void FindShortSuccessor(std::string*) const {}
    };
 
-   // any operation that mutates the queue or the waiter state should run this to crank any pending events
-   void spin_waiters();
+   // any operation that adds to the queue should crank a wakeup
+   void wake_up();
 
    // fires either if timer times out or is canceled
-   void waiter_timeout(const boost::system::error_code& e, boost::ptr_list<waiter>::iterator waiter_it);
+   void waiter_wakeup(const boost::system::error_code& e, boost::ptr_list<waiter>::iterator waiter_it);
 
    // some leveldb sugar:
 
@@ -234,6 +234,7 @@ private:
    std::set<id_type> returned_; // items < TAIL that were reserved but later returned (not popped)
 
    boost::ptr_list<waiter> waiters_;
+   boost::ptr_list<waiter>::iterator wake_up_it_;
 
    boost::asio::io_service& ios_;
 };

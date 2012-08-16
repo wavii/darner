@@ -15,6 +15,7 @@ queue::queue(asio::io_service& ios, const string& path)
   queue_tail_(key_type::KT_QUEUE, 0),
   chunks_head_(key_type::KT_CHUNK, 0),
   items_open_(0),
+  wake_up_it_(waiters_.begin()),
   ios_(ios)
 {
    leveldb::Options options;
@@ -49,7 +50,7 @@ queue::queue(asio::io_service& ios, const string& path)
 void queue::wait(size_type wait_ms, const wait_callback& cb)
 {
    ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, wait_ms, cb));
-   it->timer.async_wait(bind(&queue::waiter_timeout, this, asio::placeholders::error, it));
+   it->timer.async_wait(bind(&queue::waiter_wakeup, this, asio::placeholders::error, it));
 }
 
 queue::size_type queue::count() const
@@ -76,7 +77,7 @@ void queue::push(id_type& result, const string& item)
 
    result = queue_head_.id++;
 
-   spin_waiters(); // in case there's a waiter waiting for this new item
+   wake_up(); // in case there's a waiter waiting for this new item
 }
 
 void queue::push(id_type& result, const header_type& header)
@@ -85,7 +86,7 @@ void queue::push(id_type& result, const header_type& header)
 
    result = queue_head_.id++;
 
-   spin_waiters(); // in case there's a waiter waiting for this new item
+   wake_up(); // in case there's a waiter waiting for this new item
 }
 
 bool queue::pop_begin(id_type& result)
@@ -147,8 +148,7 @@ void queue::pop_end(bool erase, id_type id, const header_type& header)
    {
       returned_.insert(id);
 
-      // in case there's a waiter waiting for this returned key
-      spin_waiters();
+      wake_up(); // in case there's a waiter waiting for this returned key
    }
 
    --items_open_;
@@ -182,25 +182,21 @@ void queue::erase_chunks(const header_type& header)
 
 // private:
 
-void queue::spin_waiters()
+void queue::wake_up()
 {
-   while (!waiters_.empty() && (!returned_.empty() || queue_tail_.id < queue_head_.id))
+   if (wake_up_it_ != waiters_.end())
    {
-      ptr_list<waiter>::auto_type waiter = waiters_.release(waiters_.begin());
-      waiter->timer.cancel();
-      waiter->cb(system::error_code());
+      wake_up_it_->timer.cancel();
+      ++wake_up_it_;
    }
 }
 
-void queue::waiter_timeout(const system::error_code& e, ptr_list<queue::waiter>::iterator waiter_it)
+void queue::waiter_wakeup(const system::error_code& e, ptr_list<queue::waiter>::iterator waiter_it)
 {
-   if (e == asio::error::operation_aborted) // can be error if timer was canceled
-      return;
-
    ptr_list<waiter>::auto_type waiter = waiters_.release(waiter_it);
 
-   if (e) // weird unspecified error, better pass it up just in case
-      waiter->cb(e);
+   if (!returned_.empty() || queue_tail_.id < queue_head_.id)
+      waiter->cb(system::error_code());
    else
       waiter->cb(asio::error::timed_out);
 }

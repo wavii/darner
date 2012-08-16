@@ -46,6 +46,18 @@ BOOST_FIXTURE_TEST_CASE( test_pop_wait, fixtures::basic_queue )
    BOOST_REQUIRE(!error_);
 }
 
+// test the race condition where a wait callback does work that crosses it over the wait timeout
+BOOST_FIXTURE_TEST_CASE( test_pop_wait_race, fixtures::basic_queue )
+{
+   string value = "Fur pillows are hard to actually sleep on";
+   deadline_timer timer(ios_, posix_time::milliseconds(100));
+   timer.async_wait(bind(&fixtures::basic_queue::delayed_push, this, ref(value), _1));
+   queue_->wait(100, wait_cb_);
+   ios_.run();
+
+   BOOST_REQUIRE(!error_);
+}
+
 // now the opposite, test a pop wait timeout
 BOOST_FIXTURE_TEST_CASE( test_pop_wait_timeout, fixtures::basic_queue )
 {
