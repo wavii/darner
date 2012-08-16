@@ -40,7 +40,12 @@ public:
    /*
     * returns the size of the item.  only valid after first read()
     */
-    queue::size_type size() const { return header_.size; }
+   queue::size_type size() const { return header_.size; }
+
+   /*
+    * returns true if open
+    */
+   operator bool() const { return queue_; }
    
 private:
 

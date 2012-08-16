@@ -23,6 +23,7 @@ bool iqstream::open(shared_ptr<queue> queue)
    queue_ = queue;
    header_ = queue::header_type();
    chunk_pos_ = header_.beg;
+   tell_ = 0;
 
    return true;
 }
@@ -36,7 +37,10 @@ void iqstream::read(string& result)
    if (!chunk_pos_) // first read?  check if there's a header
    {
       queue_->pop_read(result, header_, id_);
-      chunk_pos_ = header_.beg;
+      if (header_.end > 1)
+         chunk_pos_ = header_.beg;
+      else
+         header_.size = result.size();
    }
 
    if (header_.end > 1) // multi-chunk?  get the next chunk!
@@ -49,7 +53,7 @@ void iqstream::read(string& result)
 void iqstream::close(bool erase)
 {
    if (!queue_)
-      throw system::system_error(asio::error::eof); // can't close something we haven't opened
+      return; // it's not an error to close more than once
 
    queue_->pop_end(erase, id_, header_);
    queue_.reset();
