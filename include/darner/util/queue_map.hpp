@@ -21,8 +21,8 @@ private:
 
 public:
 
-   typedef std::map<std::string, boost::shared_ptr<queue> >::iterator iterator;
-   typedef std::map<std::string, boost::shared_ptr<queue> >::const_iterator const_iterator;
+   typedef container_type::iterator iterator;
+   typedef container_type::const_iterator const_iterator;
 
    queue_map(boost::asio::io_service& ios, const std::string& data_path)
    : data_path_(data_path), ios_(ios)
