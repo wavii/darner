@@ -84,7 +84,7 @@ void handler::write_stats()
 
 void handler::write_version()
 {
-   buf_ = "VERSION " + string(DARNER_VERSION) + "\r\n";
+   buf_ = "VERSION " DARNER_VERSION "\r\n";
    async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
 }
 
