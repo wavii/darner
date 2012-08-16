@@ -180,7 +180,7 @@ void handler::get()
    if (!pop_stream_.open(queues_[req_.queue]))
    {
       if (req_.wait_ms) // couldn't read... can we at least wait?
-         queues_[req_.queue]->wait(req_.wait_ms, bind(&handler::get_on_queue_return, shared_from_this(), _1));
+         return queues_[req_.queue]->wait(req_.wait_ms, bind(&handler::get_on_queue_return, shared_from_this(), _1));
       else
          return end();
    }
