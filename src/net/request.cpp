@@ -36,6 +36,7 @@ request_grammar::request_grammar()
 
    get_option =
       lit("/open")     [phoenix::ref(req.get_open) = true]
+      | lit("/peek")  [phoenix::ref(req.get_peek) = true]
       | lit("/close")  [phoenix::ref(req.get_close) = true]
       | lit("/abort")  [phoenix::ref(req.get_abort) = true]
       | (

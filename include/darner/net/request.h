@@ -26,6 +26,7 @@ struct request
    std::string queue;
    size_t num_bytes;
    bool get_open;
+   bool get_peek;
    bool get_close;
    bool get_abort;
    size_t wait_ms;

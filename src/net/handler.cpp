@@ -157,8 +157,11 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
 
 void handler::get()
 {
-   if (req_.get_abort && (req_.get_open || req_.get_close))
+   if (req_.get_abort && (req_.get_open || req_.get_close || req_.get_peek))
       return error("abort must be by itself", "CLIENT_ERROR");
+
+   if (req_.get_peek && req_.get_open)
+      return error("cannot open and peek", "CLIENT_ERROR");
 
    if (req_.get_abort || req_.get_close)
    {
@@ -228,7 +231,7 @@ void handler::get_on_write_chunk(const boost::system::error_code& e, size_t byte
       {
          try
          {
-            pop_stream_.close(true);
+            pop_stream_.close(!req_.get_peek);
          }
          catch (const system::system_error& ex)
          {

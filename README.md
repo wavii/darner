@@ -62,4 +62,4 @@ Voila!  By default, Darner listens on port 22133.
 Darner follows the same protocol as [Kestrel](/robey/kestrel/blob/master/docs/guide.md#memcache), which is the memcache
 protocol.
 
-Currently missing from the Darner implementation but TODO: `/peek`, `FLUSH`, `FLUSH_ALL`, `DELETE`, and some stats.
+Currently missing from the Darner implementation but TODO: `FLUSH`, `FLUSH_ALL`, `DELETE`, and some stats.
