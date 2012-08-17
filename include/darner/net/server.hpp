@@ -47,7 +47,7 @@ public:
 
    void stop()
    {
-      ios_.post(boost::bind(&server::handle_close, this));
+      ios_.stop();
 
       // let the thread exit
       runner_.join();
@@ -58,11 +58,7 @@ private:
    void handle_accept(const boost::system::error_code& e)
    {
       if (e)
-      {
-         if (e != boost::asio::error::operation_aborted) // abort comes from canceling the acceptor
-            log::ERROR("server::handle_accept: %1%", e.message());
-         return;
-      }
+         return log::ERROR("server::handle_accept: %1%", e.message());
 
       handler_->start();
 
@@ -71,16 +67,10 @@ private:
          boost::bind(&server::handle_accept, this, boost::asio::placeholders::error));
    }
 
-   void handle_close()
-   {
-      acceptor_.close();
-   }
-
    unsigned short listen_port_;
 
    boost::asio::io_service ios_;
 
-   boost::scoped_ptr<boost::asio::io_service::work> work_;
    boost::asio::ip::tcp::acceptor acceptor_;
 
    queue_map queues_;
