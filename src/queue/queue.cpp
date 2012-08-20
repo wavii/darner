@@ -195,6 +195,9 @@ void queue::wake_up()
 
 void queue::waiter_wakeup(const system::error_code& e, ptr_list<queue::waiter>::iterator waiter_it)
 {
+   if (waiter_it == wake_up_it_) // did we time out on the next waiter in line?  too bad.
+      ++wake_up_it_;
+
    ptr_list<waiter>::auto_type waiter = waiters_.release(waiter_it);
 
    if (!returned_.empty() || queue_tail_.id < queue_head_.id)
