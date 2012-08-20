@@ -38,12 +38,35 @@ BOOST_FIXTURE_TEST_CASE( test_pop_wait, fixtures::basic_queue )
 {
    string value = "sometimes I push the door close button on people running towards the elevator. I just need my own "
                   "elevator sometimes, my 7 floor sanctuary";
+   posix_time::ptime beg = boost::posix_time::microsec_clock::local_time();
    deadline_timer timer(ios_, posix_time::milliseconds(10));
    timer.async_wait(bind(&fixtures::basic_queue::delayed_push, this, ref(value), _1));
    queue_->wait(100, wait_cb_);
    ios_.run();
+   boost::posix_time::ptime end = boost::posix_time::microsec_clock::local_time();
 
    BOOST_REQUIRE(!error_);
+   BOOST_REQUIRE_LT((end - beg).total_milliseconds(), 50); // should come back sooner than the timeout
+}
+
+// test multiple waiters
+BOOST_FIXTURE_TEST_CASE( test_multiple_pop_wait, fixtures::basic_queue )
+{
+   string value1 = "I’m just tryna keep it symmetrical";
+   string value2 = "Hotel robe got me feeling like a Sheik";
+   posix_time::ptime beg = boost::posix_time::microsec_clock::local_time();
+   deadline_timer timer1(ios_, posix_time::milliseconds(10));
+   timer1.async_wait(bind(&fixtures::basic_queue::delayed_push, this, ref(value1), _1));
+   deadline_timer timer2(ios_, posix_time::milliseconds(20));
+   timer2.async_wait(bind(&fixtures::basic_queue::delayed_push, this, ref(value2), _1));
+   queue_->wait(100, wait_cb_);
+   queue_->wait(100, wait_cb_);
+   ios_.run();
+   boost::posix_time::ptime end = boost::posix_time::microsec_clock::local_time();
+
+   BOOST_REQUIRE(!error_);
+   BOOST_REQUIRE_EQUAL(cb_count_, 2);
+   BOOST_REQUIRE_LT((end - beg).total_milliseconds(), 50); // should come back sooner than the timeout
 }
 
 // test the race condition where a wait callback does work that crosses it over the wait timeout

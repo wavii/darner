@@ -50,6 +50,8 @@ queue::queue(asio::io_service& ios, const string& path)
 void queue::wait(size_type wait_ms, const wait_callback& cb)
 {
    ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, wait_ms, cb));
+   if (wake_up_it_ == waiters_.end())
+      wake_up_it_ = it;
    it->timer.async_wait(bind(&queue::waiter_wakeup, this, asio::placeholders::error, it));
 }
 

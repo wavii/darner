@@ -18,7 +18,8 @@ class basic_queue
 public:
 
    basic_queue()
-   : wait_cb_(boost::bind(&basic_queue::wait_cb, this, _1)),
+   : cb_count_(0),
+     wait_cb_(boost::bind(&basic_queue::wait_cb, this, _1)),
      tmp_(boost::filesystem::temp_directory_path() / boost::filesystem::unique_path())
    {
       boost::filesystem::create_directories(tmp_);
@@ -42,12 +43,15 @@ protected:
 
    void wait_cb(const boost::system::error_code& error)
    {
-      error_ = error;
+      if (!error_)
+         error_ = error;
+      ++cb_count_;
    }
 
    std::string pop_value_;
 
    boost::system::error_code error_;
+   size_t cb_count_;
    darner::queue::wait_callback wait_cb_;
 
    boost::asio::io_service ios_;
