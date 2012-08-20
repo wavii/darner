@@ -1,0 +1,13 @@
+2012.08.20, 0.1.0
+
+  * Fix timeout/cancel race condition on get wait.
+
+  * Totally halt io_service when Darner gets a signal, exit safely.
+
+  * Add /peek option to get.
+
+  * Clean up iqstream/oqstream semantics.  Drop use of boost::optional.
+
+  * Darner bench: add option to sprinkle in bad requests
+
+  * Track enqueued/dequeued stat.
