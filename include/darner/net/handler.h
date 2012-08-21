@@ -1,8 +1,6 @@
 #ifndef __DARNER_HANDLER_HPP__
 #define __DARNER_HANDLER_HPP__
 
-#include <sstream>
-
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/bind.hpp>
@@ -79,15 +77,15 @@ private:
 
    void end(const char* msg = "END\r\n")
    {
+      buf_ = msg;
+
       boost::asio::async_write(
-         socket_, boost::asio::buffer(msg), boost::bind(&handler::read_request, shared_from_this(), _1, _2));
+         socket_, boost::asio::buffer(buf_), boost::bind(&handler::read_request, shared_from_this(), _1, _2));
    }
 
    void error(const char* msg, const char* error_type = "ERROR")
    {
-      std::ostringstream oss;
-      oss << error_type << ' ' << msg << "\r\n";
-      buf_ = oss.str();
+      buf_ = error_type + std::string(" ") + msg + std::string("\r\n");
 
       boost::asio::async_write(
          socket_, boost::asio::buffer(buf_), boost::bind(&handler::hang_up, shared_from_this(), _1, _2));
