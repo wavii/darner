@@ -80,7 +80,7 @@ private:
    void end(const char* msg = "END\r\n")
    {
       boost::asio::async_write(
-         socket_, boost::asio::buffer(msg), boost::bind(&handler::read_request, shared_from_this(), _1, _2));
+         socket_, boost::asio::buffer(std::string(msg)), boost::bind(&handler::read_request, shared_from_this(), _1, _2));
    }
 
    void error(const char* msg, const char* error_type = "ERROR")
