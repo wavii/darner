@@ -151,7 +151,18 @@ private:
 
       leveldb::Slice slice() const;
 
-      int compare(const key_type& other) const;
+      int compare(const key_type& other) const
+      {
+         if (type < other.type)
+            return -1;
+         else if (type > other.type)
+            return 1;
+         else if (id < other.id)
+            return -1;
+         else if (id > other.id)
+            return 1;
+         return 0;
+      }
 
       unsigned char type;
       id_type id;
@@ -193,6 +204,9 @@ private:
    // fires either if timer times out or is canceled
    void waiter_wakeup(const boost::system::error_code& e, boost::ptr_list<waiter>::iterator waiter_it);
 
+   // compact the underlying journal, discarding deleted items
+   void compact();
+
    // some leveldb sugar:
 
    void put(const key_type& key, const std::string& value)
@@ -230,6 +244,7 @@ private:
    key_type chunks_head_;
 
    size_type items_open_; // an open item is < TAIL but not in returned_
+   size_type bytes_evicted_; // after we've evicted 32MB from the journal, compress that evicted range
 
    std::set<id_type> returned_; // items < TAIL that were reserved but later returned (not popped)
 
@@ -237,6 +252,7 @@ private:
    boost::ptr_list<waiter>::iterator wake_up_it_;
 
    boost::asio::io_service& ios_;
+   const std::string path_;
 };
 
 } // darner
