@@ -46,6 +46,18 @@ BOOST_FIXTURE_TEST_CASE( test_get, fixtures::basic_request )
    BOOST_REQUIRE_EQUAL(request_.wait_ms, 500);
 }
 
+// test that we get some options correctly for a gets
+BOOST_FIXTURE_TEST_CASE( test_gets, fixtures::basic_request )
+{
+   BOOST_REQUIRE(parser_.parse(request_, string("gets bar+woof/t=700/close/open\r\n")));
+   BOOST_REQUIRE_EQUAL(request_.type, darner::request::RT_GET);
+   BOOST_REQUIRE_EQUAL(request_.queue, "bar+woof");
+   BOOST_REQUIRE(request_.get_open);
+   BOOST_REQUIRE(request_.get_close);
+   BOOST_REQUIRE(!request_.get_abort);
+   BOOST_REQUIRE_EQUAL(request_.wait_ms, 700);
+}
+
 // test that reparsing clears fields that were previously set
 BOOST_FIXTURE_TEST_CASE( test_reparse, fixtures::basic_request )
 {
