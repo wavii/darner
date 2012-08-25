@@ -44,7 +44,7 @@ request_grammar::request_grammar()
          >> qi::uint_  [phoenix::ref(req.wait_ms) = qi::_1]
         );
 
-   get = lit("get ")   [phoenix::ref(req.type) = request::RT_GET]
+   get = (lit("get ")|lit("gets "))   [phoenix::ref(req.type) = request::RT_GET]
       >> key_name      [phoenix::ref(req.queue) = qi::_1]
       >> *get_option;
 
