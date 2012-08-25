@@ -36,7 +36,7 @@ request_grammar::request_grammar()
 
    get_option =
       lit("/open")     [phoenix::ref(req.get_open) = true]
-      | lit("/peek")  [phoenix::ref(req.get_peek) = true]
+      | lit("/peek")   [phoenix::ref(req.get_peek) = true]
       | lit("/close")  [phoenix::ref(req.get_close) = true]
       | lit("/abort")  [phoenix::ref(req.get_abort) = true]
       | (
@@ -44,7 +44,10 @@ request_grammar::request_grammar()
          >> qi::uint_  [phoenix::ref(req.wait_ms) = qi::_1]
         );
 
-   get = (lit("get ")|lit("gets "))   [phoenix::ref(req.type) = request::RT_GET]
+   get =
+      lit("get")       [phoenix::ref(req.type) = request::RT_GET]
+      >> -lit('s') // "gets" is okay too
+      >> ' '
       >> key_name      [phoenix::ref(req.queue) = qi::_1]
       >> *get_option;
 
