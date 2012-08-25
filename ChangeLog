@@ -1,3 +1,7 @@
+2012.08.24, 0.1.2
+
+  * Fix long compaction times and memory bloat when items are big and the queue is big.
+
 2012.08.22, 0.1.1
 
   * Builds correctly for Boost >1.46, tested up to 1.50. [Norman Casagrande, Henrik Bjørnskov]
