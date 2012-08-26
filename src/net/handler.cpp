@@ -1,5 +1,7 @@
 #include "darner/net/handler.h"
 
+#include <cstdio>
+
 #include <boost/array.hpp>
 
 using namespace std;
@@ -197,7 +199,31 @@ void handler::get()
       return error("get", ex);
    }
 
-   write_first_chunk();
+   header_buf_.resize(21 + req_.queue.size()); // 21 = len("VALUE  0 4294967296\r\n")
+   header_buf_.resize(::sprintf(&header_buf_[0], "VALUE %s 0 %lu\r\n", req_.queue.c_str(), pop_stream_.size()));
+
+   if (pop_stream_.tell() == pop_stream_.size())
+   {
+      if (!req_.get_open)
+      {
+         try
+         {
+            pop_stream_.close(!req_.get_peek);
+         }
+         catch (const system::system_error& ex)
+         {
+            return error("get_on_write_chunk", ex, false);
+         }
+      }
+      ++stats_.items_dequeued;
+      array<const_buffer, 3> bufs = {{ buffer(header_buf_), buffer(buf_), buffer("\r\nEND\r\n", 7) }};
+      async_write(socket_, bufs, bind(&handler::read_request, shared_from_this(), _1, _2));
+   }
+   else
+   {
+      array<const_buffer, 2> bufs = {{ buffer(header_buf_), buffer(buf_) }};
+      async_write(socket_, bufs, bind(&handler::get_on_write_chunk, shared_from_this(), _1, _2));
+   }
 }
 
 void handler::get_on_queue_return(const boost::system::error_code& e)
@@ -208,16 +234,6 @@ void handler::get_on_queue_return(const boost::system::error_code& e)
       return error("get_on_queue_return", e);
    else
       get();
-}
-
-void handler::write_first_chunk()
-{
-   ostringstream oss;
-   oss << "VALUE " << req_.queue << " 0 " << pop_stream_.size() << "\r\n";
-   header_buf_ = oss.str();
-   array<const_buffer, 2> bufs = {{ buffer(header_buf_), buffer(buf_) }};
-
-   async_write(socket_, bufs, bind(&handler::get_on_write_chunk, shared_from_this(), _1, _2));
 }
 
 void handler::get_on_write_chunk(const boost::system::error_code& e, size_t bytes_transferred)

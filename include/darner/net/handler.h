@@ -1,6 +1,9 @@
 #ifndef __DARNER_HANDLER_HPP__
 #define __DARNER_HANDLER_HPP__
 
+#include <vector>
+#include <string>
+
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/bind.hpp>
@@ -65,8 +68,6 @@ private:
 
    void get_on_queue_return(const boost::system::error_code& e);
 
-   void write_first_chunk();
-
    void get_on_read_next_chunk(const boost::system::error_code& e);
 
    void get_on_write_chunk(const boost::system::error_code& e, size_t bytes_transferred);
@@ -104,7 +105,7 @@ private:
       {
          buf_ = "SERVER_ERROR " + ex.code().message() + "\r\n";
          boost::asio::async_write(
-            socket_, boost::asio::buffer(buf_), boost::bind(&handler::hang_up, shared_from_this(), _1, _2));      
+            socket_, boost::asio::buffer(buf_), boost::bind(&handler::hang_up, shared_from_this(), _1, _2));
       }
    }
 
@@ -117,7 +118,7 @@ private:
    queue_map& queues_;
    stats& stats_;
    boost::asio::streambuf in_;
-   std::string header_buf_;
+   std::vector<char> header_buf_;
    std::string buf_;
    request req_;
 
