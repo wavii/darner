@@ -3,7 +3,6 @@
 
 #include <string>
 
-#include <boost/thread/tss.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
@@ -47,14 +46,10 @@ public:
 
    bool parse(request& req, std::string::const_iterator begin, std::string::const_iterator end)
    {
-      if (!grammars_.get())
-         grammars_.reset(new request_grammar());
-      request_grammar& grammar = *grammars_;
-
-      grammar.req = request();
-      bool success = boost::spirit::qi::parse(begin, end, grammar) && (begin == end);
+      grammar_.req = request();
+      bool success = boost::spirit::qi::parse(begin, end, grammar_) && (begin == end);
       if (success)
-         req = grammar.req;
+         req = grammar_.req;
 
       return success;
    }
@@ -67,7 +62,7 @@ public:
 
 private:
 
-   boost::thread_specific_ptr<request_grammar> grammars_;
+   request_grammar grammar_;
 };
 
 } // darner
