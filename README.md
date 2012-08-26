@@ -23,21 +23,17 @@ Darner is used at [Wavii](http://wavii.com/), and is written and maintained by [
 ## Installing
 
 You'll need build tools, [CMake](http://www.cmake.org/), [Boost](http://www.boost.org/), and
-[LevelDB](https://code.google.com/p/leveldb/)/[snappy](https://code.google.com/p/snappy/) to build Darner:
+[LevelDB](https://code.google.com/p/leveldb/)/[snappy](https://code.google.com/p/snappy/) to build Darner.  The
+following works on Ubuntu 12.04:
 
 ```bash
-sudo apt-get install -y build-essential cmake libboost-all-dev libsnappy-dev
-wget https://leveldb.googlecode.com/files/leveldb-1.5.0.tar.gz
-tar xvzf leveldb-1.5.0.tar.gz && cd leveldb
-make
-sudo mv libleveldb.* /usr/local/lib/ && sudo chown root:root /usr/local/lib/libleveldb.*
-cd ..
+sudo apt-get install -y build-essential cmake libboost-all-dev libsnappy-dev libleveldb-dev
 ```
 
 Then you can fetch and install Darner:
 
 ```bash
-git clone git@github.com:wavii/darner.git
+git clone git://github.com/wavii/darner.git
 cd darner
 cmake . && make && sudo make install
 ```
@@ -47,9 +43,9 @@ cmake . && make && sudo make install
 Make a directory for Darner to store its queues, say `/var/spool/darner/`, then run Darner like so.
 
 ```bash
-vagrant@ubuntu-oneiric:~/workspace/darner$ ./darner -d /var/spool/darner/
+user@home:~$ darner -d /var/spool/darner/
 [INFO] 2012-Aug-13 03:59:41.047739: darner: queue server
-[INFO] 2012-Aug-13 03:59:41.048051: build: Aug 12 2012 (22:24:28) v0.0.1 (c) Wavii, Inc.
+[INFO] 2012-Aug-13 03:59:41.048051: build: Aug 26 2012 (15:47:48) v0.1.2 (c) Wavii, Inc.
 [INFO] 2012-Aug-13 03:59:41.048132: listening on port: 22133
 [INFO] 2012-Aug-13 03:59:41.048507: data dir: /var/spool/darner/
 [INFO] 2012-Aug-13 03:59:41.048798: starting up
