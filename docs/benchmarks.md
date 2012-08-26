@@ -44,8 +44,7 @@ kestrel  1048576 requests: 33848 kB
 # Queue Flooding
 
 How quickly can we flood items through an empty queue?  This tests the raw throughput of the server.  We also include
-memcache as an upper bound - a throughput at which we are likely saturating on `send/recv` syscalls.  We had to stop the
-kestrel benchmark at 300 concurrent connections - anything higher caused connection errors and timeouts.
+memcache as an upper bound - a throughput at which we are likely saturating on `send/recv` syscalls.
 
 ![Queue Flood Benchmark](/wavii/darner/raw/master/docs/images/bench_queue_flood.png)
 
