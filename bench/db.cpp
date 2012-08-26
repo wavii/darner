@@ -67,13 +67,13 @@ public:
      bad_client_rate_(bad_client_rate),
      action_(action)
    {
+      socket_.connect(ip::tcp::endpoint(ip::address::from_string(host_), port_));
+      socket_.set_option(ip::tcp::no_delay(true));
    }
 
    void start()
    {
-      socket_.async_connect(
-         ip::tcp::endpoint(ip::address::from_string(host_), port_),
-         bind(&session::on_connect, shared_from_this(), _1));
+      ios_.post(bind(&session::do_get_or_set, shared_from_this()));
    }
 
 private:
@@ -86,15 +86,6 @@ private:
    void fail(const string& method, const system::error_code& e)
    {
       cerr << "[ERROR] " << method << ": " << e.message() << endl;
-   }
-
-   void on_connect(const system::error_code& e)
-   {
-      if (e)
-         return fail("on_connect", e);
-
-      socket_.set_option(ip::tcp::no_delay(true));
-      do_get_or_set();
    }
 
    void do_get_or_set()
