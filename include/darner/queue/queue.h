@@ -72,11 +72,7 @@ protected:
       id_type end;
       size_type size;
 
-      const std::string& str() const;
-
-   private:
-
-      mutable std::string buf_;
+      void str(std::string& out) const;
    };
 
    // queue methods aren't meant to be used directly.  instead create an iqstream or oqstream to use it

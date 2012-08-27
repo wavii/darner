@@ -88,7 +88,11 @@ void queue::push(id_type& result, const string& item)
 
 void queue::push(id_type& result, const header_type& header)
 {
-   put(queue_head_.slice(), header.str());
+   std::string buf;
+
+   header.str(buf);
+
+   put(queue_head_.slice(), buf);
 
    result = queue_head_.id++;
 
@@ -245,10 +249,9 @@ void queue::compact()
 }
 
 // child classes
-const string& queue::header_type::str() const
+void queue::header_type::str(std::string& out) const
 {
-   buf_ = string(reinterpret_cast<const char *>(this), sizeof(header_type)) + '\1' + '\0';
-   return buf_;
+   out = string(reinterpret_cast<const char *>(this), sizeof(header_type)) + '\1' + '\0';
 }
 
 leveldb::Slice queue::key_type::slice() const
