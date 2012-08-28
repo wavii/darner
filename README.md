@@ -22,6 +22,18 @@ Darner is used at [Wavii](http://wavii.com/), and is written and maintained by [
 
 ## Installing
 
+### OSX
+
+Darner installs on a Mac via [Homebrew](/mxcl/homebrew):
+
+```bash
+brew install darner
+```
+
+Remember to update your Homebrew install if the formula is not available.
+
+### Ubuntu
+
 You'll need build tools, [CMake](http://www.cmake.org/), [Boost](http://www.boost.org/), and
 [LevelDB](https://code.google.com/p/leveldb/)/[snappy](https://code.google.com/p/snappy/) to build Darner.  The
 following works on Ubuntu 12.04:
@@ -30,21 +42,13 @@ following works on Ubuntu 12.04:
 sudo apt-get install -y build-essential cmake libboost-all-dev libsnappy-dev libleveldb-dev
 ```
 
-Then you can fetch and install Darner:
+Then fetch and install Darner:
 
 ```bash
 git clone git://github.com/wavii/darner.git
 cd darner
 cmake . && make && sudo make install
 ```
-
-If you are on a Mac you can use [Homebrew](http://github.com/mxcl/homebrew) and install Darner the following way:
-
-``` bash
-brew install darner
-```
-
-Remember to update your homebrew install if the formula is not available.
 
 ## Running
 
