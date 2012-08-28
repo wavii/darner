@@ -38,6 +38,14 @@ cd darner
 cmake . && make && sudo make install
 ```
 
+If you are on a Mac you can use [Homebrew](http://github.com/mxcl/homebrew) and install Darner the following way:
+
+``` bash
+brew install darner
+```
+
+Remember to update your homebrew install if the formula is not available.
+
 ## Running
 
 Make a directory for Darner to store its queues, say `/var/spool/darner/`, then run Darner like so.
