@@ -67,4 +67,12 @@ BOOST_FIXTURE_TEST_CASE( test_reparse, fixtures::basic_request )
    BOOST_REQUIRE_EQUAL(request_.wait_ms, 0);
 }
 
+// test that we can parse a space after the key, which some clients send
+BOOST_FIXTURE_TEST_CASE( test_key_space, fixtures::basic_request )
+{
+   BOOST_REQUIRE(parser_.parse(request_, string("get foo+meow/t=500 \r\n")));
+   BOOST_REQUIRE_EQUAL(request_.wait_ms, 500);
+   BOOST_REQUIRE_EQUAL(request_.queue, "foo+meow");
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -50,7 +50,7 @@ request_grammar::request_grammar()
       >> ' '
       >> key_name      [phoenix::ref(req.queue) = qi::_1]
       >> *get_option
-      >> *lit(' '); // be permissive to clients inserting spaces
+      >> -lit(' '); // be permissive to clients inserting spaces
 
    start = (stats | version | flush | flush_all | set | get) >> qi::eol;
 }
