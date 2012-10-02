@@ -128,7 +128,8 @@ void queue::pop_read(std::string& result_item, header_type& result_header, id_ty
       else if (result_item[result_item.size() - 2] == '\0') // \0 \0 means escaped \0
          result_item.resize(result_item.size() - 1);
       else
-         throw system::system_error(system::errc::io_error, system::system_category()); // anything else is bad data
+         throw system::system_error(system::errc::io_error,
+            boost::asio::error::get_system_category()); // anything else is bad data
    }
 
    ++items_open_;

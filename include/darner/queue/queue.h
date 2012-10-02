@@ -208,19 +208,19 @@ private:
    void put(const key_type& key, const std::string& value)
    {
       if (!journal_->Put(leveldb::WriteOptions(), key.slice(), value).ok())
-         throw boost::system::system_error(boost::system::errc::io_error, boost::system::system_category());
+         throw boost::system::system_error(boost::system::errc::io_error, boost::asio::error::get_system_category());
    }
 
    void get(const key_type& key, std::string& result)
    {
       if (!journal_->Get(leveldb::ReadOptions(), key.slice(), &result).ok())
-         throw boost::system::system_error(boost::system::errc::io_error, boost::system::system_category());
+         throw boost::system::system_error(boost::system::errc::io_error, boost::asio::error::get_system_category());
    }
 
    void write(leveldb::WriteBatch& batch)
    {
       if (!journal_->Write(leveldb::WriteOptions(), &batch).ok())
-         throw boost::system::system_error(boost::system::errc::io_error, boost::system::system_category());
+         throw boost::system::system_error(boost::system::errc::io_error, boost::asio::error::get_system_category());
    }
 
    boost::scoped_ptr<comparator> cmp_;
