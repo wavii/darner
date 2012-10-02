@@ -13,7 +13,7 @@ using namespace darner;
 request_grammar::request_grammar()
 : request_grammar::base_type(start)
 {
-   key_name =
+   key_name %=
       +((alnum|punct) - '/');
 
    stats =
