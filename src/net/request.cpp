@@ -1,15 +1,20 @@
 #include "darner/net/request.h"
 
+#include <boost/version.hpp>
+
 using namespace boost;
 using namespace boost::spirit;
 using namespace boost::spirit::ascii;
+#if BOOST_VERSION < 104100
+using namespace boost::spirit::arg_names;
+#endif
 using namespace darner;
 
 request_grammar::request_grammar()
 : request_grammar::base_type(start)
 {
    key_name =
-      +((qi::alnum|qi::punct) - '/');
+      +((alnum|punct) - '/');
 
    stats =
       lit("stats")     [phoenix::ref(req.type) = request::RT_STATS];
@@ -19,20 +24,20 @@ request_grammar::request_grammar()
 
    flush =
       lit("flush ")    [phoenix::ref(req.type) = request::RT_FLUSH]
-      >> key_name      [phoenix::ref(req.queue) = qi::_1];
+      >> key_name      [phoenix::ref(req.queue) = _1];
 
    flush_all =
       lit("flush_all") [phoenix::ref(req.type) = request::RT_FLUSH_ALL];
 
    set =
       lit("set ")      [phoenix::ref(req.type) = request::RT_SET]
-      >> key_name      [phoenix::ref(req.queue) = qi::_1]
+      >> key_name      [phoenix::ref(req.queue) = _1]
       >> ' '
-      >> qi::uint_ // flags (ignored)
+      >> uint_ // flags (ignored)
       >> ' '
-      >> qi::uint_ // expiration (ignored for now)
+      >> uint_ // expiration (ignored for now)
       >> ' '
-      >> qi::uint_     [phoenix::ref(req.num_bytes) = qi::_1];
+      >> uint_         [phoenix::ref(req.num_bytes) = _1];
 
    get_option =
       lit("/open")     [phoenix::ref(req.get_open) = true]
@@ -41,16 +46,16 @@ request_grammar::request_grammar()
       | lit("/abort")  [phoenix::ref(req.get_abort) = true]
       | (
          lit("/t=")
-         >> qi::uint_  [phoenix::ref(req.wait_ms) = qi::_1]
+         >> uint_      [phoenix::ref(req.wait_ms) = _1]
         );
 
    get =
       lit("get")       [phoenix::ref(req.type) = request::RT_GET]
       >> -lit('s') // "gets" is okay too
       >> ' '
-      >> key_name      [phoenix::ref(req.queue) = qi::_1]
+      >> key_name      [phoenix::ref(req.queue) = _1]
       >> *get_option
       >> -lit(' '); // be permissive to clients inserting spaces
 
-   start = (stats | version | flush | flush_all | set | get) >> qi::eol;
+   start = (stats | version | flush | flush_all | set | get) >> eol;
 }
