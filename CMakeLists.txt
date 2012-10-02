@@ -35,7 +35,7 @@ ADD_EXECUTABLE(test
                tests/main
                )
 
-FIND_PACKAGE(Boost 1.46.1 COMPONENTS thread system program_options unit_test_framework filesystem)
+FIND_PACKAGE(Boost 1.40.0 COMPONENTS thread system program_options unit_test_framework filesystem)
 
 TARGET_LINK_LIBRARIES(darner pthread ${Boost_LIBRARIES} leveldb snappy)
 TARGET_LINK_LIBRARIES(db ${Boost_LIBRARIES})
