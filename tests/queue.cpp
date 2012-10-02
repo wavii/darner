@@ -73,8 +73,8 @@ BOOST_FIXTURE_TEST_CASE( test_multiple_pop_wait, fixtures::basic_queue )
 BOOST_FIXTURE_TEST_CASE( test_pop_wait_race, fixtures::basic_queue )
 {
    string value = "Fur pillows are hard to actually sleep on";
-   deadline_timer timer(ios_, posix_time::milliseconds(100));
-   timer.async_wait(bind(&fixtures::basic_queue::delayed_push, this, ref(value), _1));
+   deadline_timer timer(ios_, posix_time::milliseconds(80));
+   timer.async_wait(bind(&fixtures::basic_queue::delayed_push_block, this, ref(value), _1));
    queue_->wait(100, wait_cb_);
    ios_.run();
 
