@@ -30,7 +30,8 @@ public:
       boost::filesystem::directory_iterator end_it;
       for (boost::filesystem::directory_iterator it(data_path_); it != end_it; ++it)
       {
-         std::string queue_name = it->path().leaf().string();
+         std::string queue_name =
+            boost::filesystem::path(it->path().filename()).string(); // useless recast for boost backwards compat
          boost::shared_ptr<queue> p(new queue(ios_, (data_path_ / queue_name).string()));
          queues_.insert(container_type::value_type(queue_name, p));
       }
