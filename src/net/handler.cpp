@@ -179,8 +179,8 @@ void handler::get()
    else if (pop_stream_)
       return error("close current item first", "CLIENT_ERROR");
 
-   if (req_.get_abort)
-      return end(); // aborts go no further
+   if ((req_.get_close && !req_.get_open) || req_.get_abort)
+      return end(); // closes/aborts go no further
 
    if (!pop_stream_.open(queues_[req_.queue]))
    {
