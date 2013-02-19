@@ -11,7 +11,7 @@ How much memory does the queue server use?  We are testing both steady-state mem
 the server acquires and releases memory as queues expand and contract.  We tuned Kestrel's JVM down to the smallest
 heap that didn't cause OOM's and didn't impact performance: `-Xmx512m`.
 
-![Resident Memory Benchmark](/wavii/darner/raw/master/docs/images/bench_memory_resident.png)
+![Resident Memory Benchmark](https://raw.github.com/wavii/darner/master/docs/images/bench_memory_resident.png)
 
 ```
 ubuntu@ip-10-6-51-186:~/darner$ bench/mem_rss.sh
@@ -46,7 +46,7 @@ kestrel  1048576 requests: 33848 kB
 How quickly can we flood items through an empty queue?  This tests the raw throughput of the server.  We also include
 memcache as an upper bound - a throughput at which we are likely saturating on `send/recv` syscalls.
 
-![Queue Flood Benchmark](/wavii/darner/raw/master/docs/images/bench_queue_flood.png)
+![Queue Flood Benchmark](https://raw.github.com/wavii/darner/master/docs/images/bench_queue_flood.png)
 
 ```
 ubuntu@domU-12-31-39-0E-0C-72:~/darner$ bench/flood.sh 
@@ -110,7 +110,7 @@ How does the queue server deal with messages of varying sizes?  This benchmark p
 in order to see whether they cause latency spikes for smaller requests, which can lead to timeouts.  For the graph
 below, a flatter curve means each request is more fairly served in time.
 
-![Fairness Benchmark](/wavii/darner/raw/master/docs/images/bench_fairness.png)
+![Fairness Benchmark](https://raw.github.com/wavii/darner/master/docs/images/bench_fairness.png)
 
 ```
 ubuntu@ip-10-6-51-186:~/darner$ bench/fairness.sh
@@ -167,7 +167,7 @@ This tests the queue server's behavior with a backlog of items.  The challenge f
 that no longer all fit in memory.  Absolute throughput isn't important here - item sizes are large to quickly saturate
 free memory.  Instead it's important for the throughput to flatten out as the backlog grows.
 
-![Queue Packing Benchmark](/wavii/darner/raw/master/docs/images/bench_queue_packing.png)
+![Queue Packing Benchmark](https://raw.github.com/wavii/darner/master/docs/images/bench_queue_packing.png)
 
 ```
 ubuntu@ip-10-6-51-186:~/darner$ bench/packing.sh
