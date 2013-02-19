@@ -29,9 +29,13 @@ request_grammar::request_grammar()
    flush_all =
       lit("flush_all") [phoenix::ref(req.type) = request::RT_FLUSH_ALL];
 
+   set_option =
+      lit("/sync")     [phoenix::ref(req.set_sync) = true];
+
    set =
       lit("set ")      [phoenix::ref(req.type) = request::RT_SET]
       >> key_name      [phoenix::ref(req.queue) = _1]
+      >> *set_option
       >> ' '
       >> uint_ // flags (ignored)
       >> ' '
