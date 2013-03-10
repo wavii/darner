@@ -80,12 +80,12 @@ protected:
    /*
     * pushes an item to to the queue.
     */
-   void push(id_type& result, const std::string& item);
+   void push(id_type& result, const std::string& item, bool sync);
 
    /*
     * pushes a header to to the queue.  a header points to a range of chunks in a multi-chunk item.
     */
-   void push(id_type& result, const header_type& header);
+   void push(id_type& result, const header_type& header, bool sync);
 
    /*
     * begins popping an item.  if no items are available, immediately returns false.  once an item pop is begun,
@@ -205,9 +205,11 @@ private:
 
    // some leveldb sugar:
 
-   void put(const key_type& key, const std::string& value)
+   void put(const key_type& key, const std::string& value, bool sync = false)
    {
-      if (!journal_->Put(leveldb::WriteOptions(), key.slice(), value).ok())
+      leveldb::WriteOptions write_options;
+      write_options.sync = sync;
+      if (!journal_->Put(write_options, key.slice(), value).ok())
          throw boost::system::system_error(boost::system::errc::io_error, boost::asio::error::get_system_category());
    }
 

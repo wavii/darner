@@ -73,26 +73,26 @@ void queue::write_stats(const string& name, ostringstream& out) const
 
 // protected:
 
-void queue::push(id_type& result, const string& item)
+void queue::push(id_type& result, const string& item, bool sync)
 {
    // items that end in 0 are escaped to (0, 0), so we can distinguish them from headers (which end in (1, 0))
    if (item[item.size() - 1] == '\0')
-      put(queue_head_, item + '\0');
+      put(queue_head_, item + '\0', sync);
    else
-      put(queue_head_, item);
+      put(queue_head_, item, sync);
 
    result = queue_head_.id++;
 
    wake_up(); // in case there's a waiter waiting for this new item
 }
 
-void queue::push(id_type& result, const header_type& header)
+void queue::push(id_type& result, const header_type& header, bool sync)
 {
    std::string buf;
 
    header.str(buf);
 
-   put(queue_head_.slice(), buf);
+   put(queue_head_.slice(), buf, sync);
 
    result = queue_head_.id++;
 

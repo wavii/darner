@@ -20,7 +20,7 @@ public:
     * immediately opens an oqstream for writing.  the stream will automatically close after chunks_count chunks
     * have been written
     */
-   void open(boost::shared_ptr<queue> queue, queue::size_type chunks_count);
+   void open(boost::shared_ptr<queue> queue, queue::size_type chunks_count, bool sync = false);
 
    /*
     * writes a chunk of the item. fails if more chunks are written than originally reserved.
@@ -44,6 +44,7 @@ private:
    queue::id_type id_; // id of key in queue, only set after all chunks are written
    queue::header_type header_; // only set if it's multi-chunk
    queue::size_type chunk_pos_;
+   bool sync_;
 };
 
 } // darner
