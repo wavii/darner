@@ -92,12 +92,19 @@ void handler::write_version()
 
 void handler::flush()
 {
-   // TODO: implement
+   queues_.flush_queue(req_.queue);
+
+   buf_ = "OK\r\n";
+   async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
 }
 
 void handler::flush_all()
 {
-   // TODO: implement
+   for (queue_map::const_iterator it = queues_.begin(); it != queues_.end(); ++it)
+      queues_.flush_queue(it->first);
+
+   buf_ = "OK\r\n";
+   async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
 }
 
 void handler::set()
