@@ -28,6 +28,7 @@ struct request
    bool get_peek;
    bool get_close;
    bool get_abort;
+   bool set_sync;
    size_t wait_ms;
 };
 
@@ -36,7 +37,7 @@ struct request_grammar : boost::spirit::qi::grammar<std::string::const_iterator>
    request_grammar();
    request req;
    boost::spirit::qi::rule<std::string::const_iterator, std::string()> key_name;
-   boost::spirit::qi::rule<std::string::const_iterator> stats, version, flush, flush_all, set, get_option, get, start;
+   boost::spirit::qi::rule<std::string::const_iterator> stats, version, flush, flush_all, set_option, set, get_option, get, start;
 };
 
 // grammar are expensive to construct.  to be thread-safe, let's make one grammar per thread.

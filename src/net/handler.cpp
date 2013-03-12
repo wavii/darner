@@ -103,7 +103,7 @@ void handler::flush_all()
 void handler::set()
 {
    // round up the number of chunks we need, and fetch \r\n if it's just one chunk
-   push_stream_.open(queues_[req_.queue], (req_.num_bytes + chunk_size_ - 1) / chunk_size_);
+   push_stream_.open(queues_[req_.queue], (req_.num_bytes + chunk_size_ - 1) / chunk_size_, req_.set_sync);
    queue::size_type remaining = req_.num_bytes - push_stream_.tell();
    queue::size_type required = remaining > chunk_size_ ? chunk_size_ : remaining + 2;
 

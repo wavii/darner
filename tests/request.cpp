@@ -34,6 +34,16 @@ BOOST_FIXTURE_TEST_CASE( test_set, fixtures::basic_request )
    BOOST_REQUIRE_EQUAL(request_.num_bytes, 31337);
 }
 
+// test that we get the sync flag for a set correctly
+BOOST_FIXTURE_TEST_CASE( test_set_sync, fixtures::basic_request )
+{
+   BOOST_REQUIRE(parser_.parse(request_, string("set foo+meow/sync 0 0 31337\r\n")));
+   BOOST_REQUIRE_EQUAL(request_.type, darner::request::RT_SET);
+   BOOST_REQUIRE_EQUAL(request_.queue, "foo+meow");
+   BOOST_REQUIRE_EQUAL(request_.num_bytes, 31337);
+   BOOST_REQUIRE_EQUAL(request_.set_sync, true);
+}
+
 // test that we get some options correctly for a get
 BOOST_FIXTURE_TEST_CASE( test_get, fixtures::basic_request )
 {

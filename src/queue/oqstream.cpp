@@ -29,11 +29,12 @@ oqstream::~oqstream()
    }
 }
 
-void oqstream::open(boost::shared_ptr<queue> queue, queue::size_type chunks_count)
+void oqstream::open(boost::shared_ptr<queue> queue, queue::size_type chunks_count, bool sync)
 {
    if (queue_) // already open?  that's a paddlin'
       throw system::system_error(asio::error::already_open);
 
+   sync_ = sync;
    queue_ = queue;
    header_ = queue::header_type();
    if (chunks_count > 1)
@@ -47,7 +48,7 @@ void oqstream::write(const std::string& chunk)
       throw system::system_error(asio::error::eof);
 
    if (header_.end <= 1) // just one chunk? push it on
-      queue_->push(id_, chunk);
+      queue_->push(id_, chunk, sync_);
    else
       queue_->write_chunk(chunk, chunk_pos_);
 
@@ -56,7 +57,7 @@ void oqstream::write(const std::string& chunk)
    if (++chunk_pos_ == header_.end) // time to close up shop?
    {
       if (header_.end > 1) // multi-chunk?  push the header
-         queue_->push(id_, header_);
+         queue_->push(id_, header_, sync_);
       queue_.reset();
    }
 }
