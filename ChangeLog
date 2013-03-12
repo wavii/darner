@@ -1,3 +1,15 @@
+2013.03.12, 0.1.5
+
+  * Homebrew install instructions [Henrik Bjørnskov]
+
+  * Be permissive to clients using extra whitespace in requests.
+
+  * Supports older Boost. (1.40.0)
+
+  * Fix /close returning the next item when it shouldn't.
+
+  * Add /sync flag for synchronous writes for set. [anight]
+
 2012.08.26, 0.1.4
 
   * Fix bad cast sometimes causing memory fault.
