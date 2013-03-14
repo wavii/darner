@@ -217,7 +217,6 @@ void queue::flush_db()
 
    wake_up(); // in case there's a waiter waiting
 
-   waiters_.clear();
    journal_.reset(); // close level_db
    boost::filesystem::remove_all(path_);
 
