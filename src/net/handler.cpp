@@ -127,8 +127,7 @@ void handler::flush()
       queues_.flush_queue(req_.queue);
    } // flush set to false
 
-   buf_ = "OK\r\n";
-   async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
+   return end("OK\r\n");
 }
 
 void handler::flush_all()
@@ -147,12 +146,14 @@ void handler::flush_all()
          queues_.flush_queue(it->first);
    } // flush set to false
 
-   buf_ = "OK\r\n";
-   async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
+   return end("OK\r\n");
 }
 
 void handler::set()
 {
+   if (flushing_)
+      return end("NOT STORED\r\n");
+
    shared_ptr<scoped_op> pOp(new scoped_op(ops_open_));
 
    // round up the number of chunks we need, and fetch \r\n if it's just one chunk
@@ -216,11 +217,7 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
 void handler::get()
 {
    if (flushing_)
-   {
-      buf_ = "OK\r\n";
-      async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
-      return;
-   }
+      return end("OK\r\n"); // nothing to return
 
    if (req_.get_abort && (req_.get_open || req_.get_close || req_.get_peek))
       return error("abort must be by itself", "CLIENT_ERROR");
