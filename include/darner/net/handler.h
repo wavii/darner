@@ -40,6 +40,22 @@ public:
 
 private:
 
+   // keep a tally on the operations that touch the queues currently running
+   // (with the exception of flushes)
+   class scoped_op
+   {
+   public:
+      scoped_op(int& op_counter) 
+      : op_counter_(op_counter)
+      { ++op_counter_; }
+
+      ~scoped_op()
+      { --op_counter_; }
+
+   private:
+      int& op_counter_;
+   };
+
    // read from the socket up until a newline (request delimter)
    void read_request(const boost::system::error_code& e, size_t bytes_transferred);
 
@@ -62,7 +78,7 @@ private:
 
    // set loop:
 
-   void set_on_read_chunk(const boost::system::error_code& e, size_t bytes_transferred);
+   void set_on_read_chunk(const boost::system::error_code& e, size_t bytes_transferred, boost::shared_ptr<scoped_op> pOp);
 
    // get loop:
 
@@ -70,7 +86,7 @@ private:
 
    void get_on_read_next_chunk(const boost::system::error_code& e);
 
-   void get_on_write_chunk(const boost::system::error_code& e, size_t bytes_transferred);
+   void get_on_write_chunk(const boost::system::error_code& e, size_t bytes_transferred, boost::shared_ptr<scoped_op> pOp);
 
    void get_on_pop_close_post(const boost::system::error_code& e);
 
@@ -117,6 +133,9 @@ private:
    request_parser& parser_;
    queue_map& queues_;
    stats& stats_;
+   bool flushing_;
+   int ops_open_;
+
    boost::asio::streambuf in_;
    std::vector<char> header_buf_;
    std::string buf_;

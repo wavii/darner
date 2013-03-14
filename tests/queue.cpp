@@ -127,6 +127,21 @@ BOOST_FIXTURE_TEST_CASE( test_queue_count, fixtures::basic_queue )
    BOOST_REQUIRE_EQUAL(queue_->count(), 1);
 }
 
+// test that we can delete and reopen queue
+BOOST_FIXTURE_TEST_CASE( test_queue_delete_reopen, fixtures::basic_queue )
+{
+   string value = "More than once, I've wished my real life had a delete key";
+
+   oqs_.open(queue_, 1);
+   oqs_.write(value);
+   queue_.reset(new darner::queue(ios_, (tmp_ / "queue").string()));
+   BOOST_REQUIRE_EQUAL(queue_->count(), 1);
+
+   // delete and start fresh
+   queue_->flush_db();
+   BOOST_REQUIRE_EQUAL(queue_->count(), 0);
+}
+
 // test overruning an oqstream raises 
 BOOST_FIXTURE_TEST_CASE( test_oqstream_overflow, fixtures::basic_queue )
 {

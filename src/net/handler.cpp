@@ -3,11 +3,29 @@
 #include <cstdio>
 
 #include <boost/array.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 using namespace std;
 using namespace boost;
 using namespace boost::asio;
 using namespace darner;
+
+// simple RAII to make sure we're never gonna get out of a flush
+// operation with a flushing_ variable set to true
+class scoped_flush
+{
+public:
+   scoped_flush(bool& flush) 
+   : flush_(flush)
+   { flush_ = true; }
+
+   ~scoped_flush()
+   { flush_ = false; }
+
+private:
+   bool& flush_;
+};
+
 
 handler::handler(io_service& ios,
                  request_parser& parser,
@@ -19,6 +37,8 @@ handler::handler(io_service& ios,
      parser_(parser),
      queues_(queues),
      stats_(_stats),
+     flushing_(false),
+     ops_open_(0),
      in_(chunk_size + 2) // make room for \r\n
 {
 }
@@ -75,6 +95,8 @@ void handler::write_stats()
    ostringstream oss;
    stats_.write(oss);
 
+   scoped_op op(ops_open_);
+
    for (queue_map::const_iterator it = queues_.begin(); it != queues_.end(); ++it)
       it->second->write_stats(it->first, oss);
 
@@ -92,16 +114,48 @@ void handler::write_version()
 
 void handler::flush()
 {
-   // TODO: implement
+   {
+      scoped_flush sf(flushing_);
+
+      if (ops_open_ > 0)
+      {
+         // we still have some ops running, let's wait 10ms
+         deadline_timer t(socket_.get_io_service(), boost::posix_time::milliseconds(10));
+         t.async_wait(bind(&handler::flush, shared_from_this()));
+      }
+
+      queues_.flush_queue(req_.queue);
+   } // flush set to false
+
+   return end("OK\r\n");
 }
 
 void handler::flush_all()
 {
-   // TODO: implement
+   {
+      scoped_flush sf(flushing_);
+
+      if (ops_open_ > 0)
+      {
+         // we still have some ops running, let's wait 10ms
+         deadline_timer t(socket_.get_io_service(), boost::posix_time::milliseconds(10));
+         t.async_wait(bind(&handler::flush_all, shared_from_this()));
+      }
+
+      for (queue_map::const_iterator it = queues_.begin(); it != queues_.end(); ++it)
+         queues_.flush_queue(it->first);
+   } // flush set to false
+
+   return end("OK\r\n");
 }
 
 void handler::set()
 {
+   if (flushing_)
+      return end("NOT STORED\r\n");
+
+   shared_ptr<scoped_op> pOp(new scoped_op(ops_open_));
+
    // round up the number of chunks we need, and fetch \r\n if it's just one chunk
    push_stream_.open(queues_[req_.queue], (req_.num_bytes + chunk_size_ - 1) / chunk_size_, req_.set_sync);
    queue::size_type remaining = req_.num_bytes - push_stream_.tell();
@@ -109,13 +163,16 @@ void handler::set()
 
    async_read(
       socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
-      bind(&handler::set_on_read_chunk, shared_from_this(), _1, _2));
+      bind(&handler::set_on_read_chunk, shared_from_this(), _1, _2, pOp));
 }
 
-void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transferred)
+void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transferred, shared_ptr<scoped_op> pOp)
 {
    if (e)
+   {
+      --ops_open_;
       return error("set_on_read_chunk", e);
+   }
 
    asio::streambuf::const_buffers_type bufs = in_.data();
    queue::size_type bytes_remaining = req_.num_bytes - push_stream_.tell();
@@ -154,11 +211,14 @@ void handler::set_on_read_chunk(const system::error_code& e, size_t bytes_transf
    queue::size_type required = remaining > chunk_size_ ? chunk_size_ : remaining + 2;
    async_read(
       socket_, in_, transfer_at_least(required > in_.size() ? required - in_.size() : 0),
-      bind(&handler::set_on_read_chunk, shared_from_this(), _1, _2));
+      bind(&handler::set_on_read_chunk, shared_from_this(), _1, _2, pOp));
 }
 
 void handler::get()
 {
+   if (flushing_)
+      return end("OK\r\n"); // nothing to return
+
    if (req_.get_abort && (req_.get_open || req_.get_close || req_.get_peek))
       return error("abort must be by itself", "CLIENT_ERROR");
 
@@ -189,6 +249,9 @@ void handler::get()
       else
          return end();
    }
+
+   // we're starting the operation on the queue here
+   shared_ptr<scoped_op> pOp(new scoped_op(ops_open_));
 
    try
    {
@@ -222,7 +285,7 @@ void handler::get()
    else
    {
       array<const_buffer, 2> bufs = {{ buffer(header_buf_), buffer(buf_) }};
-      async_write(socket_, bufs, bind(&handler::get_on_write_chunk, shared_from_this(), _1, _2));
+      async_write(socket_, bufs, bind(&handler::get_on_write_chunk, shared_from_this(), _1, _2, pOp));
    }
 }
 
@@ -236,7 +299,7 @@ void handler::get_on_queue_return(const boost::system::error_code& e)
       get();
 }
 
-void handler::get_on_write_chunk(const boost::system::error_code& e, size_t bytes_transferred)
+void handler::get_on_write_chunk(const boost::system::error_code& e, size_t bytes_transferred, boost::shared_ptr<scoped_op> pOp)
 {
    if (e)
       return error("get_on_write_chunk", e, false);
@@ -269,6 +332,6 @@ void handler::get_on_write_chunk(const boost::system::error_code& e, size_t byte
          return error("get_on_write_chunk", ex, false);
       }
 
-      async_write(socket_, buffer(buf_), bind(&handler::get_on_write_chunk, shared_from_this(), _1, _2));
+      async_write(socket_, buffer(buf_), bind(&handler::get_on_write_chunk, shared_from_this(), _1, _2, pOp));
    }
 }

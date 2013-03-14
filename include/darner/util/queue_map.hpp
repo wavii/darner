@@ -50,6 +50,15 @@ public:
       return it->second;
    }
 
+   bool flush_queue(const std::string& queue_name)
+   {
+      iterator it = queues_.find(queue_name);
+      if (it == queues_.end())
+         return; // nothing to do
+
+      it->second->flush_db();
+   }
+
    iterator begin()             { return queues_.begin(); }
    iterator end()               { return queues_.end(); }
    const_iterator begin() const { return queues_.begin(); }

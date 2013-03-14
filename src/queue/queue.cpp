@@ -1,6 +1,7 @@
 #include "darner/queue/queue.h"
 
 #include <boost/bind.hpp>
+#include <boost/filesystem.hpp>
 
 #include <leveldb/iterator.h>
 #include <leveldb/write_batch.h>
@@ -18,16 +19,28 @@ queue::queue(asio::io_service& ios, const string& path)
   chunks_head_(key_type::KT_CHUNK, 0),
   items_open_(0),
   bytes_evicted_(0),
+  total_flushes_(0),
   wake_up_it_(waiters_.begin()),
   ios_(ios),
   path_(path)
 {
+   init_db();
+}
+
+void queue::init_db()
+{
+   queue_head_.id = 0;
+   queue_tail_.id = 0;
+   chunks_head_.id = 0;
+   //wake_up_it_ = waiters_.begin();
+
    leveldb::Options options;
    options.create_if_missing = true;
    options.comparator = cmp_.get();
+
    leveldb::DB* pdb;
-   if (!leveldb::DB::Open(options, path, &pdb).ok())
-      throw runtime_error("can't open journal: " + path);
+   if (!leveldb::DB::Open(options, path_, &pdb).ok())
+      throw runtime_error("can't open journal: " + path_);
    journal_.reset(pdb);
    // get head and tail of queue
    scoped_ptr<leveldb::Iterator> it(journal_->NewIterator(leveldb::ReadOptions()));
@@ -69,6 +82,7 @@ void queue::write_stats(const string& name, ostringstream& out) const
    out << "STAT queue_" << name << "_items " << count() << "\r\n";
    out << "STAT queue_" << name << "_waiters " << waiters_.size() << "\r\n";
    out << "STAT queue_" << name << "_open_transactions " << items_open_ << "\r\n";
+   out << "STAT queue_" << name << "_total_flushes " << total_flushes_ << "\r\n";
 }
 
 // protected:
@@ -195,6 +209,22 @@ void queue::erase_chunks(const header_type& header)
       batch.Delete(k.slice());
 
    write(batch);
+}
+
+void queue::flush_db()
+{
+   log::INFO("queue <%1%>: flushing db", path_);
+
+   wake_up(); // in case there's a waiter waiting
+
+   journal_.reset(); // close level_db
+   boost::filesystem::remove_all(path_);
+
+   items_open_ = 0;
+   bytes_evicted_ = 0;
+
+   init_db(); // now create a new one
+   ++total_flushes_;
 }
 
 // private:

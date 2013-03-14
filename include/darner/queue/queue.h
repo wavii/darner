@@ -50,6 +50,9 @@ public:
    // writes out stats (stuff like queue count) to a stream
    void write_stats(const std::string& name, std::ostringstream& out) const;
 
+   // flush the db by deleting it and creating a new one
+   void flush_db();
+
 protected:
 
    friend class iqstream;
@@ -194,6 +197,9 @@ private:
       void FindShortSuccessor(std::string*) const {}
    };
 
+   // initalize level db
+   void init_db();
+
    // any operation that adds to the queue should crank a wakeup
    void wake_up();
 
@@ -243,6 +249,7 @@ private:
 
    size_type items_open_; // an open item is < TAIL but not in returned_
    size_type bytes_evicted_; // after we've evicted 32MB from the journal, compress that evicted range
+   size_type total_flushes_; // total number of times this queue has been flushed
 
    std::set<id_type> returned_; // items < TAIL that were reserved but later returned (not popped)
 
