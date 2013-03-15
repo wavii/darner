@@ -42,7 +42,7 @@ public:
    // open or create the queue at the path
    queue(boost::asio::io_service& ios, const std::string& path);
 
-   // destroy the queue, and delete the journal if delete_on_destroy() was called
+   // destruct the queue, and delete the journal if destroy() was called
    ~queue();
 
    // wait up to wait_ms milliseconds for an item to become available, then call cb with success or timeout
@@ -50,6 +50,9 @@ public:
 
    // delete the journal upon destruction
    void destroy();
+
+   // flushes all items from the queue
+   void flush();
 
    // returns the number of items in the queue
    size_type count() const;
@@ -253,7 +256,7 @@ private:
 
    std::set<id_type> returned_; // items < TAIL that were reserved but later returned (not popped)
 
-   bool delete_; // if true, we will delete the journal upon destruction
+   bool destroy_; // if true, we will delete the journal upon destruction
 
    boost::ptr_list<waiter> waiters_;
    boost::ptr_list<waiter>::iterator wake_up_it_;

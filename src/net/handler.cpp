@@ -99,12 +99,15 @@ void handler::destroy()
 
 void handler::flush()
 {
-   // TODO: implement
+   queues_[req_.queue]->flush();
+   return end();
 }
 
 void handler::flush_all()
 {
-   // TODO: implement
+   for (queue_map::iterator it = queues_.begin(); it != queues_.end(); ++it)
+      it->second->flush();
+   return end("Flushed all queues.");
 }
 
 void handler::set()

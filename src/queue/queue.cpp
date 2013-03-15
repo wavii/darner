@@ -20,7 +20,7 @@ queue::queue(asio::io_service& ios, const string& path)
   chunks_head_(key_type::KT_CHUNK, 0),
   items_open_(0),
   bytes_evicted_(0),
-  delete_(false),
+  destroy_(false),
   wake_up_it_(waiters_.begin()),
   ios_(ios),
   path_(path)
@@ -57,7 +57,7 @@ queue::queue(asio::io_service& ios, const string& path)
 queue::~queue()
 {
    journal_.reset();
-   if (delete_)
+   if (destroy_)
       boost::filesystem::remove_all(path_);
 }
 
@@ -71,7 +71,7 @@ void queue::wait(size_type wait_ms, const wait_callback& cb)
 
 void queue::destroy()
 {
-   if (delete_)
+   if (destroy_)
       return; // already going to delete on dtor!
 
    // rename the journal dir in case the user creates a new queue with the same name before this one is destroyed
@@ -89,7 +89,13 @@ void queue::destroy()
 
    journal_.reset(pdb);
    path_ = new_path;
-   delete_ = true;
+   destroy_ = true;
+}
+
+void queue::flush()
+{
+   queue_tail_ = queue_head_;
+   returned_.clear();
 }
 
 queue::size_type queue::count() const

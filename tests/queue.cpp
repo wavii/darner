@@ -210,5 +210,15 @@ BOOST_FIXTURE_TEST_CASE( test_delete_queue, fixtures::basic_queue )
    BOOST_REQUIRE(!filesystem::exists(tmp_ / "queue.0")); // finally, destroying the queue deletes the journal
 }
 
+// test that we can flush a queue
+BOOST_FIXTURE_TEST_CASE( test_flush, fixtures::basic_queue )
+{
+   string value = "Sometimes I get emotional over fonts";
+   oqs_.open(queue_, 1);
+   oqs_.write(value);
+   queue_->flush();
+   BOOST_REQUIRE_EQUAL(queue_->count(), 0);
+   BOOST_REQUIRE(!iqs_.open(queue_));
+}
 
 BOOST_AUTO_TEST_SUITE_END()
