@@ -11,6 +11,7 @@
 #include <boost/asio.hpp>
 #include <boost/function.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 #include <leveldb/db.h>
 #include <leveldb/comparator.h>
@@ -28,7 +29,7 @@ namespace darner {
  *
  * queue is not thread-safe, it assumes a single-thread calling and operating the provided io_service
  */
-class queue
+class queue : public boost::enable_shared_from_this<queue>
 {
 public:
 
@@ -41,8 +42,14 @@ public:
    // open or create the queue at the path
    queue(boost::asio::io_service& ios, const std::string& path);
 
+   // destroy the queue, and delete the journal if delete_on_destroy() was called
+   ~queue();
+
    // wait up to wait_ms milliseconds for an item to become available, then call cb with success or timeout
    void wait(size_type wait_ms, const wait_callback& cb);
+
+   // delete the journal upon destruction
+   void destroy();
 
    // returns the number of items in the queue
    size_type count() const;
@@ -246,11 +253,13 @@ private:
 
    std::set<id_type> returned_; // items < TAIL that were reserved but later returned (not popped)
 
+   bool delete_; // if true, we will delete the journal upon destruction
+
    boost::ptr_list<waiter> waiters_;
    boost::ptr_list<waiter>::iterator wake_up_it_;
 
    boost::asio::io_service& ios_;
-   const std::string path_;
+   std::string path_;
 };
 
 } // darner

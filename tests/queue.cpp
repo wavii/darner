@@ -197,4 +197,18 @@ BOOST_FIXTURE_TEST_CASE( test_push_zero, fixtures::basic_queue )
    BOOST_REQUIRE_EQUAL(value, pop_value_);
 }
 
+// test that we can delete a queue when we are done with it
+BOOST_FIXTURE_TEST_CASE( test_delete_queue, fixtures::basic_queue )
+{
+   queue_->destroy();
+   BOOST_REQUIRE(!filesystem::exists(tmp_ / "queue"));
+   BOOST_REQUIRE(filesystem::exists(tmp_ / "queue.0")); // first delete gets .0
+   darner::queue queue2(ios_, (tmp_ / "queue").string());
+   queue2.destroy();
+   BOOST_REQUIRE(filesystem::exists(tmp_ / "queue.1")); // second delete gets .1
+   queue_.reset();
+   BOOST_REQUIRE(!filesystem::exists(tmp_ / "queue.0")); // finally, destroying the queue deletes the journal
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()
