@@ -63,6 +63,7 @@ void handler::parse_request(const system::error_code& e, size_t bytes_transferre
    {
    case request::RT_STATS:     write_stats();   break;
    case request::RT_VERSION:   write_version(); break;
+   case request::RT_DESTROY:   destroy();       break;
    case request::RT_FLUSH:     flush();         break;
    case request::RT_FLUSH_ALL: flush_all();     break;
    case request::RT_SET:       ++stats_.cmd_sets; set(); break;
@@ -88,6 +89,12 @@ void handler::write_version()
 {
    buf_ = "VERSION " DARNER_VERSION "\r\n";
    async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
+}
+
+void handler::destroy()
+{
+   queues_.erase(req_.queue);
+   return end("DELETED");
 }
 
 void handler::flush()
