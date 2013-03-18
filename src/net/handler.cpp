@@ -94,7 +94,7 @@ void handler::write_version()
 void handler::destroy()
 {
    queues_.erase(req_.queue, false);
-   return end("DELETED");
+   return end("DELETED\r\n");
 }
 
 void handler::flush()
@@ -109,7 +109,7 @@ void handler::flush_all()
 {
    for (queue_map::iterator it = queues_.begin(); it != queues_.end(); ++it)
       queues_.erase(it->first, true);
-   return end("Flushed all queues.");
+   return end("Flushed all queues.\r\n");
 }
 
 void handler::set()
