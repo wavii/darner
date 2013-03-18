@@ -93,20 +93,22 @@ void handler::write_version()
 
 void handler::destroy()
 {
-   queues_.erase(req_.queue);
+   queues_.erase(req_.queue, false);
    return end("DELETED");
 }
 
 void handler::flush()
 {
-   queues_[req_.queue]->flush();
+   // TODO: flush should guarantee that an item that's halfway pushed should still appear after
+   // the flush.  right now, item will only appear to a client that was waiting to pop before the flush 
+   queues_.erase(req_.queue, true);
    return end();
 }
 
 void handler::flush_all()
 {
    for (queue_map::iterator it = queues_.begin(); it != queues_.end(); ++it)
-      it->second->flush();
+      queues_.erase(it->first, true);
    return end("Flushed all queues.");
 }
 

@@ -51,9 +51,6 @@ public:
    // delete the journal upon destruction
    void destroy();
 
-   // flushes all items from the queue
-   void flush();
-
    // returns the number of items in the queue
    size_type count() const;
 

@@ -57,6 +57,8 @@ queue::queue(asio::io_service& ios, const string& path)
 queue::~queue()
 {
    journal_.reset();
+   // TODO: most non-crap filesystems should be able to drop large files quickly, but this will block painfully on ext3.
+   // one ugly solution is a separate delete thread.  or we can wait out everyone upgrading to ext4    :)
    if (destroy_)
       boost::filesystem::remove_all(path_);
 }
@@ -90,12 +92,6 @@ void queue::destroy()
    journal_.reset(pdb);
    path_ = new_path;
    destroy_ = true;
-}
-
-void queue::flush()
-{
-   queue_tail_ = queue_head_;
-   returned_.clear();
 }
 
 queue::size_type queue::count() const
