@@ -5,7 +5,7 @@
 #include <map>
 
 #include <boost/asio.hpp>
-#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/filesystem/operations.hpp>
 
 #include "darner/queue/queue.h"
@@ -32,8 +32,7 @@ public:
       {
          std::string queue_name =
             boost::filesystem::path(it->path().filename()).string(); // useless recast for boost backwards compat
-         boost::shared_ptr<queue> p(new queue(ios_, (data_path_ / queue_name).string()));
-         queues_.insert(container_type::value_type(queue_name, p));
+         queues_[queue_name] = boost::make_shared<queue>(boost::ref(ios_), (data_path_ / queue_name).string());
       }
    }
 
@@ -42,12 +41,25 @@ public:
       iterator it = queues_.find(queue_name);
 
       if (it == queues_.end())
-      {
-         boost::shared_ptr<queue> p(new queue(ios_, (data_path_ / queue_name).string()));
-         it = queues_.insert(container_type::value_type(queue_name, p)).first;
-      }
+         it = queues_.insert(container_type::value_type(queue_name,
+            boost::make_shared<queue>(boost::ref(ios_), (data_path_ / queue_name).string()))).first;
 
       return it->second;
+   }
+
+   void erase(const std::string& queue_name, bool recreate = false)
+   {
+      iterator it = queues_.find(queue_name);
+
+      if (it == queues_.end())
+         return;
+
+      it->second->destroy();
+
+      queues_.erase(it);
+
+      if (recreate)
+         queues_[queue_name] = boost::make_shared<queue>(boost::ref(ios_), (data_path_ / queue_name).string());
    }
 
    iterator begin()             { return queues_.begin(); }

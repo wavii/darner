@@ -63,6 +63,7 @@ void handler::parse_request(const system::error_code& e, size_t bytes_transferre
    {
    case request::RT_STATS:     write_stats();   break;
    case request::RT_VERSION:   write_version(); break;
+   case request::RT_DESTROY:   destroy();       break;
    case request::RT_FLUSH:     flush();         break;
    case request::RT_FLUSH_ALL: flush_all();     break;
    case request::RT_SET:       ++stats_.cmd_sets; set(); break;
@@ -90,14 +91,25 @@ void handler::write_version()
    async_write(socket_, buffer(buf_), bind(&handler::read_request, shared_from_this(), _1, _2));
 }
 
+void handler::destroy()
+{
+   queues_.erase(req_.queue, false);
+   return end("DELETED\r\n");
+}
+
 void handler::flush()
 {
-   // TODO: implement
+   // TODO: flush should guarantee that an item that's halfway pushed should still appear after
+   // the flush.  right now, item will only appear to a client that was waiting to pop before the flush 
+   queues_.erase(req_.queue, true);
+   return end();
 }
 
 void handler::flush_all()
 {
-   // TODO: implement
+   for (queue_map::iterator it = queues_.begin(); it != queues_.end(); ++it)
+      queues_.erase(it->first, true);
+   return end("Flushed all queues.\r\n");
 }
 
 void handler::set()
