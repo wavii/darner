@@ -150,6 +150,8 @@ bool queue::pop_begin(id_type& result)
    else
       return false;
 
+   ++items_open_;
+
    return true;
 }
 
@@ -170,8 +172,6 @@ void queue::pop_read(std::string& result_item, header_type& result_header, id_ty
          throw system::system_error(system::errc::io_error,
             boost::asio::error::get_system_category()); // anything else is bad data
    }
-
-   ++items_open_;
 }
 
 void queue::pop_end(bool erase, id_type id, const header_type& header)
