@@ -52,6 +52,8 @@ private:
 
    void write_version();
 
+   void destroy(); // really "delete", but that's a reserved word
+
    void flush();
 
    void flush_all();

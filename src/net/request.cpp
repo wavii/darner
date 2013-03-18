@@ -22,6 +22,10 @@ request_grammar::request_grammar()
    version =
       lit("version")   [phoenix::ref(req.type) = request::RT_VERSION];
 
+   destroy =
+      lit("delete ")   [phoenix::ref(req.type) = request::RT_DESTROY]
+      >> key_name      [phoenix::ref(req.queue) = _1];
+
    flush =
       lit("flush ")    [phoenix::ref(req.type) = request::RT_FLUSH]
       >> key_name      [phoenix::ref(req.queue) = _1];
@@ -61,5 +65,5 @@ request_grammar::request_grammar()
       >> *get_option
       >> -lit(' '); // be permissive to clients inserting spaces
 
-   start = (stats | version | flush | flush_all | set | get) >> eol;
+   start = (stats | version | destroy | flush | flush_all | set | get) >> eol;
 }

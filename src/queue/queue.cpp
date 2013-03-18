@@ -1,6 +1,8 @@
 #include "darner/queue/queue.h"
 
 #include <boost/bind.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #include <leveldb/iterator.h>
 #include <leveldb/write_batch.h>
@@ -18,6 +20,7 @@ queue::queue(asio::io_service& ios, const string& path)
   chunks_head_(key_type::KT_CHUNK, 0),
   items_open_(0),
   bytes_evicted_(0),
+  destroy_(false),
   wake_up_it_(waiters_.begin()),
   ios_(ios),
   path_(path)
@@ -51,12 +54,44 @@ queue::queue(asio::io_service& ios, const string& path)
    }
 }
 
+queue::~queue()
+{
+   journal_.reset();
+   // TODO: most non-crap filesystems should be able to drop large files quickly, but this will block painfully on ext3.
+   // one ugly solution is a separate delete thread.  or we can wait out everyone upgrading to ext4    :)
+   if (destroy_)
+      boost::filesystem::remove_all(path_);
+}
+
 void queue::wait(size_type wait_ms, const wait_callback& cb)
 {
    ptr_list<waiter>::iterator it = waiters_.insert(waiters_.end(), new waiter(ios_, wait_ms, cb));
    if (wake_up_it_ == waiters_.end())
       wake_up_it_ = it;
-   it->timer.async_wait(bind(&queue::waiter_wakeup, this, asio::placeholders::error, it));
+   it->timer.async_wait(bind(&queue::waiter_wakeup, shared_from_this(), asio::placeholders::error, it));
+}
+
+void queue::destroy()
+{
+   if (destroy_)
+      return; // already going to delete on dtor!
+
+   // rename the journal dir in case the user creates a new queue with the same name before this one is destroyed
+   string new_path = path_ + ".0";
+   for (size_t i = 0; boost::filesystem::exists(new_path); ++i)
+      new_path = path_ + "." + lexical_cast<string>(i);
+   journal_.reset();
+   boost::filesystem::rename(path_, new_path);
+
+   leveldb::DB* pdb;
+   leveldb::Options options;
+   options.comparator = cmp_.get();
+   if (!leveldb::DB::Open(options, new_path, &pdb).ok())
+      throw runtime_error("can't open journal: " + path_); // should never happen, but fatal if it does
+
+   journal_.reset(pdb);
+   path_ = new_path;
+   destroy_ = true;
 }
 
 queue::size_type queue::count() const
@@ -111,6 +146,8 @@ bool queue::pop_begin(id_type& result)
    else
       return false;
 
+   ++items_open_;
+
    return true;
 }
 
@@ -131,8 +168,6 @@ void queue::pop_read(std::string& result_item, header_type& result_header, id_ty
          throw system::system_error(system::errc::io_error,
             boost::asio::error::get_system_category()); // anything else is bad data
    }
-
-   ++items_open_;
 }
 
 void queue::pop_end(bool erase, id_type id, const header_type& header)
