@@ -6,7 +6,7 @@ designed to handle queues much larger than what can be held in RAM.  And unlike 
 virtual memory manager via [log-structured storage](https://code.google.com/p/leveldb/).
 
 The result is a durable queue server that uses a small amount of in-resident memory regardless of queue size, while
-still achieving [remarkable performance](/wavii/darner/blob/master/docs/benchmarks.md).
+still achieving [remarkable performance](/docs/benchmarks.md).
 
 Darner is based on Robey Pointer's [Kestrel](/robey/kestrel) simple, distributed message queue.  Like Kestrel, Darner
 follows the "No talking! Shhh!" approach to distributed queues:  A single Darner server has a set of queues identified
@@ -16,7 +16,7 @@ a message, the message will be handed to the next client.
 
 Compared to Kestrel, Darner boasts much higher throughput, better concurrency, an order of magnitude better tp99, and
 uses an order of magnitude less memory.  But Darner has less configuration, and far fewer features than Kestrel. Check
-out the [benchmarks](/wavii/darner/blob/master/docs/benchmarks.md)!
+out the [benchmarks](/docs/benchmarks.md)!
 
 Darner is used at [Wavii](http://wavii.com/), and is written and maintained by [Erik Frey](/erikfrey).
 
