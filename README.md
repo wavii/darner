@@ -71,3 +71,7 @@ Darner follows the same protocol as [Kestrel](/robey/kestrel/blob/master/docs/gu
 protocol.
 
 Currently missing from the Darner implementation but TODO: some stats.
+
+## See also
+
+[Siberite](https://github.com/bogdanovich/siberite) - Darner rewritten with Go.
