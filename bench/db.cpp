@@ -50,7 +50,7 @@ struct results
    size_t sets_remaining;
 };
 
-class session : public enable_shared_from_this<session>
+class session : public boost::enable_shared_from_this<session>
 {
 public:
 
