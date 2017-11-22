@@ -101,6 +101,7 @@ BOOST_FIXTURE_TEST_CASE( test_queue_close_reopen, fixtures::basic_queue )
 
    oqs_.open(queue_, 1);
    oqs_.write(value);
+   queue_.reset();
    queue_.reset(new darner::queue(ios_, (tmp_ / "queue").string()));
    BOOST_REQUIRE_EQUAL(queue_->count(), 1);
 
