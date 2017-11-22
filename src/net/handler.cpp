@@ -228,12 +228,12 @@ void handler::get()
          }
       }
       ++stats_.items_dequeued;
-      array<const_buffer, 3> bufs = {{ buffer(header_buf_), buffer(buf_), buffer("\r\nEND\r\n", 7) }};
+      boost::array<const_buffer, 3> bufs = {{ buffer(header_buf_), buffer(buf_), buffer("\r\nEND\r\n", 7) }};
       async_write(socket_, bufs, bind(&handler::read_request, shared_from_this(), _1, _2));
    }
    else
    {
-      array<const_buffer, 2> bufs = {{ buffer(header_buf_), buffer(buf_) }};
+      boost::array<const_buffer, 2> bufs = {{ buffer(header_buf_), buffer(buf_) }};
       async_write(socket_, bufs, bind(&handler::get_on_write_chunk, shared_from_this(), _1, _2));
    }
 }
