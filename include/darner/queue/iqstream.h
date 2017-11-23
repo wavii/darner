@@ -45,7 +45,7 @@ public:
    /*
     * returns true if open
     */
-   operator bool() const { return queue_; }
+   operator bool() const { return static_cast<bool>(queue_); }
    
 private:
 

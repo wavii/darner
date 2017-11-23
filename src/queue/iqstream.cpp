@@ -12,7 +12,7 @@ iqstream::~iqstream()
       queue_->pop_end(false, id_, header_);
 }
 
-bool iqstream::open(shared_ptr<queue> queue)
+bool iqstream::open(boost::shared_ptr<queue> queue)
 {
    if (queue_)
       throw system::system_error(asio::error::already_open); // can't open what's open

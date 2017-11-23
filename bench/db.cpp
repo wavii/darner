@@ -50,12 +50,12 @@ struct results
    size_t sets_remaining;
 };
 
-class session : public enable_shared_from_this<session>
+class session : public boost::enable_shared_from_this<session>
 {
 public:
 
    typedef ip::tcp::socket socket_type;
-   typedef shared_ptr<session> ptr_type;
+   typedef boost::shared_ptr<session> ptr_type;
 
    session(io_service& ios, results& _results, const string& host, size_t port, size_t bad_client_rate,
       size_t action = 0)

@@ -35,9 +35,11 @@ ADD_EXECUTABLE(test
                tests/main
                )
 
-FIND_PACKAGE(Boost 1.40.0 COMPONENTS thread system program_options unit_test_framework filesystem)
+FIND_PACKAGE(Boost 1.40.0 COMPONENTS thread system program_options filesystem unit_test_framework)
 
-TARGET_LINK_LIBRARIES(darner pthread ${Boost_LIBRARIES} leveldb snappy)
+# Explicitly list libraries for each Boost component to avoid linking server executable to the unit test library
+TARGET_LINK_LIBRARIES(darner pthread ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} leveldb snappy)
+
 TARGET_LINK_LIBRARIES(db ${Boost_LIBRARIES})
 TARGET_LINK_LIBRARIES(test pthread ${Boost_LIBRARIES} leveldb snappy)
 
